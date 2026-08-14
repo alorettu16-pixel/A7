@@ -1,0 +1,17 @@
+{
+  "name": "A7 Trading System",
+  "short_name": "A7",
+  "description": "Multi-Strategy Research, Backtest & Paper Trading System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050510",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

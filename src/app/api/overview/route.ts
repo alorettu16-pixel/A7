@@ -1,0 +1,51 @@
+import db, { strategies, paperTrades, strategySignals, tradingViewWebhookLogs, riskLimits, equitySnapshots } from "@/db";
+import { eq, desc, gte } from "drizzle-orm";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const allTrades = await db.select().from(paperTrades);
+  let totalPnl = 0, realizedPnl = 0, unrealizedPnl = 0;
+  for (const t of allTrades) {
+    realizedPnl += t.realizedPnl || 0;
+    if (t.status === "open") unrealizedPnl += t.unrealizedPnl || 0;
+  }
+  totalPnl = realizedPnl + unrealizedPnl;
+
+  const active = await db.select().from(strategies).where(eq(strategies.status, "paper_active"));
+  const openPositions = allTrades.filter(t => t.status === "open").length;
+
+  const todayStart = new Date().toISOString().split("T")[0] + "T00:00:00.000Z";
+  const signalsToday = await db.select().from(strategySignals).where(gte(strategySignals.createdAt, todayStart));
+  const webhookToday = await db.select().from(tradingViewWebhookLogs).where(gte(tradingViewWebhookLogs.receivedAt, todayStart));
+
+  const totalStrategies = await db.select().from(strategies);
+  const hasStrategies = totalStrategies.length > 0;
+
+  const limits = await db.select().from(riskLimits).limit(1);
+  const liveTradingEnabled = limits.length > 0 ? limits[0].liveTradingEnabled : false;
+  const budgetDemo = limits.length > 0 ? limits[0].demoBudgetUsd : 10000;
+
+  const snapshots = await db
+    .select()
+    .from(equitySnapshots)
+    .orderBy(desc(equitySnapshots.snapshotAt))
+    .limit(50);
+
+  return NextResponse.json({
+    hasStrategies,
+    totalPnl: Math.round(totalPnl * 100) / 100,
+    realizedPnl: Math.round(realizedPnl * 100) / 100,
+    unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
+    activeStrategies: active.length,
+    openPositions,
+    signalsToday: signalsToday.length,
+    webhooksToday: webhookToday.length,
+    liveTradingEnabled,
+    budgetDemo: Math.round(budgetDemo * 100) / 100,
+    avgDeviation: 0,
+    equityCurve: snapshots.reverse().map(s => ({
+      time: s.snapshotAt,
+      equity: s.totalPnl,
+    })),
+  });
+}
