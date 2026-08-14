@@ -5,6 +5,7 @@ import { StrategyRules } from "@/backtest/engine";
 import { getCandles } from "@/market-data";
 import { openPaperTrade, closePaperTrade } from "@/paper-trading/engine";
 import { log, logSignal, logClose, logError, logBlock } from "@/lib/logger";
+import { sendTelegram, formatTradeOpen, formatTradeClose } from "@/lib/telegram";
 
 // Asset monitorati — più ampia copertura per più segnali
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
@@ -171,6 +172,7 @@ async function main() {
 
           const icon = signal.side === "long" ? "📈" : "📉";
           console.log(`   ${icon} ${asset} ${s.name}: ${signal.side} @ ${signal.price} — Trade #${tradeId} (size: ${actualSize}$)`);
+          await sendTelegram(formatTradeOpen(tradeId, signal.asset, signal.side, signal.price, actualSize, s.name));
           totalSignals++;
           assetOpen.add(s.id);
           currentExposure += actualSize;
