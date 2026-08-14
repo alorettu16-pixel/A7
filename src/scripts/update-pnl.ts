@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getCandles } from "@/market-data";
 import { closePaperTrade } from "@/paper-trading/engine";
 import { ExitRule } from "@/backtest/engine";
+import { sendTelegram, formatTradeClose } from "@/lib/telegram";
 
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
 
@@ -81,6 +82,7 @@ async function main() {
           if (elapsedHours >= timeExitHours) {
             console.log(`   ⏰ #${t.id} ${asset} ${side}: time exit ${timeExitHours}h scaduto → chiusura @ ${currentPrice} (elapsed ${elapsedHours.toFixed(1)}h)`);
             await closePaperTrade(t.id, currentPrice);
+            await sendTelegram(formatTradeClose(t.id, asset, side, t.entryPrice, currentPrice, 0, "time_exit", strat?.name || "?"));
             closed = true;
           }
         }
@@ -91,8 +93,10 @@ async function main() {
             if (ex.type === "tp") {
               const tpPct = ex.params.pct ?? 10;
               if (pnlPctHigh >= tpPct) {
+                const pnl = (currentPrice - t.entryPrice) / t.entryPrice * (t.simulatedPositionSize || 200);
                 console.log(`   🎯 #${t.id} ${asset} ${side}: TP ${tpPct}% raggiunto (high ${pnlPctHigh.toFixed(2)}%) → chiusura @ ${currentPrice}`);
                 await closePaperTrade(t.id, currentPrice);
+                await sendTelegram(formatTradeClose(t.id, asset, side, t.entryPrice, currentPrice, pnl, "take_profit", strat?.name || "?"));
                 closed = true;
                 break;
               }
@@ -100,8 +104,10 @@ async function main() {
             if (ex.type === "sl") {
               const slPct = ex.params.pct ?? 5;
               if (pnlPctLow <= -slPct) {
+                const pnl = (currentPrice - t.entryPrice) / t.entryPrice * (t.simulatedPositionSize || 200) * (side === "short" ? -1 : 1);
                 console.log(`   🛑 #${t.id} ${asset} ${side}: SL ${slPct}% raggiunto (low ${pnlPctLow.toFixed(2)}%) → chiusura @ ${currentPrice}`);
                 await closePaperTrade(t.id, currentPrice);
+                await sendTelegram(formatTradeClose(t.id, asset, side, t.entryPrice, currentPrice, pnl, "stop_loss", strat?.name || "?"));
                 closed = true;
                 break;
               }
