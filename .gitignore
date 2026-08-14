@@ -1,6 +1,6 @@
 node_modules/
 .next/
 a7.db
-a7.db.bak
+a7.db*
 *.log
 .env
