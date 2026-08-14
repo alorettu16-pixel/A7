@@ -2,7 +2,7 @@ import { runBacktest, StrategyRules, BacktestParams } from "@/backtest/engine";
 import { scoreBacktest } from "@/backtest/scorer";
 import { getCandles } from "@/market-data";
 import db, { backtestRuns, backtestTrades, strategies } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 
 const DEFAULT_BT_PARAMS: BacktestParams = {
   initialCapital: 10000,
@@ -23,7 +23,9 @@ async function main() {
   const allStrategies = await db
     .select()
     .from(strategies)
-    .where(eq(strategies.status, "paper_active"));
+    .where(
+      or(eq(strategies.status, "paper_active"), eq(strategies.status, "research"))
+    );
 
   console.log(`Backtest engine ufficiale su ${allStrategies.length} strategie paper_active\n`);
 
