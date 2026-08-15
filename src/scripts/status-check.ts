@@ -1,5 +1,6 @@
 import db, { paperTrades, strategies, strategySignals, riskLimits } from "@/db";
 import { eq, gte, sql } from "drizzle-orm";
+import { sendTelegram, formatStatus } from "@/lib/telegram";
 
 async function main() {
   console.log("");
@@ -87,6 +88,21 @@ async function main() {
   console.log("  npm run full-cycle          — tutto in una volta");
   console.log("  npm run go                 — status + full-cycle + status");
   console.log("═══════════════════════════════════════════\n");
+
+  // ─── Telegram report orario ────────────────────────────
+  const closedTrades = allTrades.filter(t => t.status === "closed");
+  const totalWins = closedTrades.filter(t => (t.realizedPnl || 0) > 0).length;
+  const msg = formatStatus(
+    active.length,
+    openTrades.length,
+    openTrades.reduce((s, t) => s + (t.simulatedPositionSize || 0), 0),
+    risk?.maxTotalExposureUsd || 10000,
+    totalPnl,
+    openPnl,
+    closedTrades.length,
+    totalWins
+  );
+  await sendTelegram(msg);
 }
 
 main().catch(console.error);
