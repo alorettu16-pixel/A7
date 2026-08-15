@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, TrendingUp, LayoutGrid, Webhook, Zap, Receipt, BookOpen, BarChart3, Sliders, Shield, FileText } from "lucide-react";
+import { Home, TrendingUp, LayoutGrid, Webhook, Zap, Receipt, BookOpen, BarChart3, Sliders, Shield, FileText, Calendar } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Panoramica", icon: Home },
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/regole", label: "Regole & Parametri", icon: Sliders },
   { href: "/rischio", label: "Rischio & Esecuzione", icon: Shield },
   { href: "/report", label: "Report", icon: FileText },
+  { href: "/agenda", label: "Agenda", icon: Calendar },
 ];
 
 export function SideNav() {
