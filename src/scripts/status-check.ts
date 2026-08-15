@@ -90,19 +90,23 @@ async function main() {
   console.log("═══════════════════════════════════════════\n");
 
   // ─── Telegram report orario ────────────────────────────
-  const closedTrades = allTrades.filter(t => t.status === "closed");
-  const totalWins = closedTrades.filter(t => (t.realizedPnl || 0) > 0).length;
-  const msg = formatStatus(
-    active.length,
-    openTrades.length,
-    openTrades.reduce((s, t) => s + (t.simulatedPositionSize || 0), 0),
-    risk?.maxTotalExposureUsd || 10000,
-    totalPnl,
-    openPnl,
-    closedTrades.length,
-    totalWins
-  );
-  await sendTelegram(msg);
+  // Inviato solo se esplicitamente richiesto via env TELEGRAM_REPORT=1
+  // (dal cron orario "0 * * * *" che esegue TELEGRAM_REPORT=1 npm run status)
+  if (process.env.TELEGRAM_REPORT === "1") {
+    const closedTrades = allTrades.filter(t => t.status === "closed");
+    const totalWins = closedTrades.filter(t => (t.realizedPnl || 0) > 0).length;
+    const msg = formatStatus(
+      active.length,
+      openTrades.length,
+      openTrades.reduce((s, t) => s + (t.simulatedPositionSize || 0), 0),
+      risk?.maxTotalExposureUsd || 10000,
+      totalPnl,
+      openPnl,
+      closedTrades.length,
+      totalWins
+    );
+    await sendTelegram(msg);
+  }
 }
 
 main().catch(console.error);
