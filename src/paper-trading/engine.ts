@@ -2,8 +2,8 @@ import db, { paperTrades, pnlSnapshots, strategies } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { getCandles } from "@/market-data";
 
-const FEE_RATE = 0.001; // 0.1% entry + exit
-const SLIPPAGE_RATE = 0.0005; // 0.05%
+const FEE_RATE = 0.0006; // 0.06% taker Bitget futures USDT-M
+const SLIPPAGE_RATE = 0.0003; // 0.03% slippage
 
 // Default exit rules (fallback quando la strategia non ha parametri)
 const DEFAULT_EXIT_RULES = {
