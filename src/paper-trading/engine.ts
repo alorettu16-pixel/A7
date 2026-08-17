@@ -1,6 +1,7 @@
 import db, { paperTrades, pnlSnapshots, strategies } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { getCandles } from "@/market-data";
+import { sendTelegram, formatTradeClose } from "@/lib/telegram";
 
 const FEE_RATE = 0.0006; // 0.06% taker Bitget futures USDT-M
 const SLIPPAGE_RATE = 0.0003; // 0.03% slippage
@@ -223,6 +224,31 @@ export async function updatePaperTradePnl(
 
     if (exitCheck.shouldClose) {
       await closePaperTrade(tradeId, exitCheck.exitPrice);
+
+      // Notifica Telegram per la chiusura
+      const closedTrade = await db
+        .select()
+        .from(paperTrades)
+        .where(eq(paperTrades.id, tradeId))
+        .limit(1);
+      if (closedTrade.length > 0) {
+        const ct = closedTrade[0];
+        // Recupera il nome della strategia
+        let strategyName = "?";
+        try {
+          const strat = await db
+            .select()
+            .from(strategies)
+            .where(eq(strategies.id, ct.strategyId))
+            .limit(1);
+          if (strat.length > 0) strategyName = strat[0].name;
+        } catch {}
+        const netPnl = ct.realizedPnl || 0;
+        await sendTelegram(formatTradeClose(
+          tradeId, ct.asset, ct.side, ct.entryPrice, exitCheck.exitPrice, netPnl, exitCheck.reason, strategyName
+        ));
+      }
+
       return { closed: true, reason: exitCheck.reason };
     }
 
@@ -315,6 +341,9 @@ export async function forceCloseStaleTrades(): Promise<number> {
     .from(paperTrades)
     .where(eq(paperTrades.status, "open"));
 
+  // Pre-carica strategie per risalire al nome
+  const allStrats = db.select().from(strategies).all();
+
   let closed = 0;
   for (const t of openTrades) {
     const openedAt = new Date(t.openedAt).getTime();
@@ -322,6 +351,12 @@ export async function forceCloseStaleTrades(): Promise<number> {
     if (hoursOpen >= 48) {
       await closePaperTrade(t.id, t.currentPrice);
       console.log(`  🔒 Trade #${t.id} ${t.asset} ${t.side} chiuso forzatamente (stale — ${Math.round(hoursOpen)}h)`);
+
+      // Notifica Telegram
+      const stratName = allStrats.find(s => s.id === t.strategyId)?.name || "?";
+      const pnl = t.realizedPnl || 0;
+      await sendTelegram(formatTradeClose(t.id, t.asset, t.side as "long" | "short", t.entryPrice, t.currentPrice, pnl, "stale_time_exit", stratName));
+
       closed++;
     }
   }

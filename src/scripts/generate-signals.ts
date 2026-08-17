@@ -115,6 +115,7 @@ async function main() {
           // Per ora, chiudiamo solo se entrambe le condizioni sono false
           await closePaperTrade(trade.id, currentPrice);
           console.log(`  🔒 Trade #${trade.id} ${asset} ${strat.name}: chiuso per reverse signal @ ${currentPrice}`);
+          await sendTelegram(formatTradeClose(trade.id, asset, trade.side, trade.entryPrice, currentPrice, 0, "reverse_signal", strat.name));
           closedCount++;
           assetOpen.delete(sid);
         }
