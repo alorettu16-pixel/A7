@@ -5,7 +5,7 @@ import { StrategyRules } from "@/backtest/engine";
 import { getCandles } from "@/market-data";
 import { openPaperTrade, closePaperTrade } from "@/paper-trading/engine";
 import { log, logSignal, logClose, logError, logBlock } from "@/lib/logger";
-import { sendTelegram, formatTradeOpen, formatTradeClose } from "@/lib/telegram";
+import { sendTelegram, formatTradeOpen, formatTradeClose, formatAlert, formatError } from "@/lib/telegram";
 
 // Asset monitorati — più ampia copertura per più segnali
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
@@ -27,6 +27,7 @@ async function main() {
 
   if (risk?.killSwitchActive) {
     logBlock("KILL SWITCH ATTIVO");
+    await sendTelegram(formatAlert("Kill Switch Attivo", "Il kill switch è inserito. Nessuna operazione verrà aperta o chiusa fino a rimozione manuale."));
     process.exit(0);
   }
 
@@ -39,6 +40,9 @@ async function main() {
 
   if (dailyPnl < 0 && dailyDrawdownPct >= maxDrawdownPct) {
     console.log(`🛑 Drawdown giornaliero ${dailyDrawdownPct.toFixed(1)}% >= ${maxDrawdownPct}% — blocco.`);
+    await sendTelegram(formatAlert("Drawdown Massimo Raggiunto",
+      `Drawdown giornaliero ${dailyDrawdownPct.toFixed(1)}% ≥ ${maxDrawdownPct}% — ciclo bloccato.\nPnL oggi: ${dailyPnl.toFixed(2)}$\nSblocco manuale richiesto.`
+    ));
     process.exit(0);
   }
 
@@ -54,6 +58,9 @@ async function main() {
 
   if (totalExposure >= budgetBasedMaxExposure) {
     console.log(`🛑 Esposizione totale ${totalExposure.toFixed(2)}$ >= budget ${budgetBasedMaxExposure.toFixed(2)}$ — blocco.`);
+    await sendTelegram(formatAlert("Esposizione Massima Raggiunta",
+      `Esposizione ${totalExposure.toFixed(2)}$ ≥ ${budgetBasedMaxExposure.toFixed(2)}$ — nessun nuovo trade.\nRiprovare al prossimo ciclo.`
+    ));
     process.exit(0);
   }
 
@@ -187,6 +194,7 @@ async function main() {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`   ❌ ${asset} ${s.name}: ${msg.slice(0, 100)}`);
+        await sendTelegram(formatError(asset, s.name, msg));
       }
     }
   };

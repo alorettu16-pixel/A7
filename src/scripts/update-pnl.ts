@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getCandles } from "@/market-data";
 import { closePaperTrade } from "@/paper-trading/engine";
 import { ExitRule } from "@/backtest/engine";
-import { sendTelegram, formatTradeClose } from "@/lib/telegram";
+import { sendTelegram, formatTradeClose, formatStartup } from "@/lib/telegram";
 
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
 

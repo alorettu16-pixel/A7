@@ -97,3 +97,15 @@ export function formatSignal(asset: string, strategy: string, side: string, pric
   const icon = side === "long" ? "📈" : "📉";
   return `${icon} *Segnale* ${asset} ${side.toUpperCase()} @ ${price} (${strategy})`;
 }
+
+export function formatAlert(title: string, body: string): string {
+  return [`🚨 *${title}*`, ``, body].join("\n");
+}
+
+export function formatStartup(): string {
+  return `✅ *A7 — Sistema avviato*\nIl ciclo trading è online.`;
+}
+
+export function formatError(asset: string, context: string, detail: string): string {
+  return [`⚠️ *Errore* ${asset}`, `Contesto: ${context}`, `Dettaglio: ${detail.slice(0, 120)}`].join("\n");
+}
