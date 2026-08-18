@@ -80,9 +80,10 @@ async function main() {
           } catch {}
 
           if (elapsedHours >= timeExitHours) {
+            const pnl = (currentPrice - t.entryPrice) / t.entryPrice * (t.simulatedPositionSize || 200) * (side === "short" ? -1 : 1);
             console.log(`   ⏰ #${t.id} ${asset} ${side}: time exit ${timeExitHours}h scaduto → chiusura @ ${currentPrice} (elapsed ${elapsedHours.toFixed(1)}h)`);
             await closePaperTrade(t.id, currentPrice);
-            await sendTelegram(formatTradeClose(t.id, asset, side, t.entryPrice, currentPrice, 0, "time_exit", strat?.name || "?"));
+            await sendTelegram(formatTradeClose(t.id, asset, side, t.entryPrice, currentPrice, pnl, "time_exit", strat?.name || "?"));
             closed = true;
           }
         }

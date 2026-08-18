@@ -120,9 +120,10 @@ async function main() {
           const currentPrice = candles[candles.length - 1].close;
           // Non chiudiamo per reverse signal su tutti — solo se la strategia ha indicator exit
           // Per ora, chiudiamo solo se entrambe le condizioni sono false
+          const pnlClose = (currentPrice - trade.entryPrice) / trade.entryPrice * (trade.simulatedPositionSize || 200) * (trade.side === "short" ? -1 : 1);
           await closePaperTrade(trade.id, currentPrice);
-          console.log(`  🔒 Trade #${trade.id} ${asset} ${strat.name}: chiuso per reverse signal @ ${currentPrice}`);
-          await sendTelegram(formatTradeClose(trade.id, asset, trade.side, trade.entryPrice, currentPrice, 0, "reverse_signal", strat.name));
+          console.log(`  🔒 Trade #${trade.id} ${asset} ${strat.name}: chiuso per reverse signal @ ${currentPrice} (PnL ${pnlClose.toFixed(2)}$)`);
+          await sendTelegram(formatTradeClose(trade.id, asset, trade.side, trade.entryPrice, currentPrice, pnlClose, "reverse_signal", strat.name));
           closedCount++;
           assetOpen.delete(sid);
         }
