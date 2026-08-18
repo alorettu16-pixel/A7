@@ -37,13 +37,26 @@ export async function sendTelegram(message: string): Promise<boolean> {
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
-        parse_mode: "Markdown",
+        parse_mode: "MarkdownV2",
         disable_web_page_preview: true,
       }),
     });
     const ok = res.ok;
     if (!ok) {
       const body = await res.text();
+      // Fallback: se Markdown fallisce, riprova in testo semplice
+      if (res.status === 400 && body.includes("can't parse entities")) {
+        const fallbackRes = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message.replace(/[*_`#]/g, ""),
+            disable_web_page_preview: true,
+          }),
+        });
+        return fallbackRes.ok;
+      }
       console.error(`Telegram error ${res.status}: ${body.slice(0, 200)}`);
     }
     return ok;
@@ -103,7 +116,7 @@ export function formatAlert(title: string, body: string): string {
 }
 
 export function formatStartup(): string {
-  return `✅ *A7 — Sistema avviato*\nIl ciclo trading è online.`;
+  return `✅ *A7 — Sistema avviato*\nIl ciclo trading \\è online\\.`;
 }
 
 export function formatError(asset: string, context: string, detail: string): string {
