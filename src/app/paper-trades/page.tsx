@@ -68,12 +68,8 @@ export default function PaperTradesPage() {
 
   if (loading) return <div className="flex justify-center pt-20"><RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" /></div>;
 
-  const openTrades = trades
-    .filter(t => t.status === "open")
-    .sort((a, b) => new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime());
-  const closedTrades = trades
-    .filter(t => t.status === "closed")
-    .sort((a, b) => new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime());
+  const openTrades = trades.filter(t => t.status === "open");
+  const closedTrades = trades.filter(t => t.status === "closed");
   const totalPnl = trades.reduce((s, t) => s + (t.realizedPnl || 0) + (t.unrealizedPnl || 0), 0);
 
   return (
