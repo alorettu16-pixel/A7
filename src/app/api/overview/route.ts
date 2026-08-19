@@ -11,6 +11,11 @@ export async function GET() {
   }
   totalPnl = realizedPnl + unrealizedPnl;
 
+  const closedTrades = allTrades.filter(t => t.status === "closed");
+  const wins = closedTrades.filter(t => (t.realizedPnl || 0) > 0).length;
+  const losses = closedTrades.filter(t => (t.realizedPnl || 0) < 0).length;
+  const winRate = closedTrades.length > 0 ? wins / closedTrades.length * 100 : 0;
+
   const active = await db.select().from(strategies).where(eq(strategies.status, "paper_active"));
   const openPositions = allTrades.filter(t => t.status === "open").length;
 
@@ -42,6 +47,11 @@ export async function GET() {
     webhooksToday: webhookToday.length,
     liveTradingEnabled,
     budgetDemo: Math.round(budgetDemo * 100) / 100,
+    totalClosed: closedTrades.length,
+    totalOpen: allTrades.filter(t => t.status === "open").length,
+    winCount: wins,
+    lossCount: losses,
+    winRate: Math.round(winRate * 100) / 100,
     avgDeviation: 0,
     equityCurve: snapshots.reverse().map(s => ({
       time: s.snapshotAt,

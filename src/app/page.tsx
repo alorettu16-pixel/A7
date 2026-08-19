@@ -308,9 +308,10 @@ export default function HomePage() {
   const totalPnl = o.totalPnl;
   const pnlPct = o.budgetDemo > 0 ? (totalPnl / o.budgetDemo) * 100 : 0;
   const isGreen = totalPnl >= 0;
-  const winCount = closedTrades.filter(t => (t.realizedPnl || 0) > 0).length;
-  const lossCount = closedTrades.filter(t => (t.realizedPnl || 0) < 0).length;
-  const winRate = closedTrades.length > 0 ? (winCount / closedTrades.length * 100) : 0;
+  const winCount = (o as any).winCount || 0;
+  const lossCount = (o as any).lossCount || 0;
+  const winRate = (o as any).winRate || 0;
+  const totalClosed = (o as any).totalClosed || closedTrades.length;
   const totalFees = closedTrades.reduce((s, t) => s + (t.feesApplied || 0), 0) + openTrades.reduce((s, t) => s + (t.feesApplied || 0), 0);
 
   return (
@@ -421,7 +422,7 @@ export default function HomePage() {
             <div className="text-sm">
               <div className="text-green-400">{winCount} vittorie</div>
               <div className="text-red-400">{lossCount} perdite</div>
-              <div className="text-[#64748b]">{closedTrades.length} totali chiusi</div>
+              <div className="text-[#64748b]">{totalClosed} totali chiusi</div>
             </div>
           </div>
         </div>
