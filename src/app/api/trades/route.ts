@@ -1,12 +1,12 @@
 import db, { paperTrades, strategies, decisionJournal, pnlSnapshots } from "@/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   const trades = await db
     .select()
     .from(paperTrades)
-    .orderBy(desc(paperTrades.openedAt))
+    .orderBy(asc(paperTrades.openedAt))
     .limit(100);
 
   const enriched = [];
