@@ -70,14 +70,10 @@ export default function PaperTradesPage() {
 
   const openTrades = trades
     .filter(t => t.status === "open")
-    .sort((a, b) => {
-      const endA = new Date(a.openedAt).getTime() + ((a as any).timeExitHours ?? 96) * 3600000;
-      const endB = new Date(b.openedAt).getTime() + ((b as any).timeExitHours ?? 96) * 3600000;
-      return endA - endB;
-    });
+    .sort((a, b) => new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime());
   const closedTrades = trades
     .filter(t => t.status === "closed")
-    .sort((a, b) => new Date(a.closedAt ?? a.openedAt).getTime() - new Date(b.closedAt ?? b.openedAt).getTime());
+    .sort((a, b) => new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime());
   const totalPnl = trades.reduce((s, t) => s + (t.realizedPnl || 0) + (t.unrealizedPnl || 0), 0);
 
   return (
