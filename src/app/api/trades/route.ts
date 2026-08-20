@@ -6,8 +6,7 @@ export async function GET() {
   const trades = await db
     .select()
     .from(paperTrades)
-    .orderBy(asc(paperTrades.openedAt))
-    .limit(100);
+    .orderBy(desc(paperTrades.openedAt));
 
   const enriched = [];
   for (const t of trades) {
