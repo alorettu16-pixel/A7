@@ -6,6 +6,54 @@ import { sendTelegram, formatTradeClose } from "@/lib/telegram";
 const FEE_RATE = 0.0006; // 0.06% taker Bitget futures USDT-M
 const SLIPPAGE_RATE = 0.0003; // 0.03% slippage
 
+// ─── ATR calculation ────────────────────────────────────────────────────────
+function computeATR(candles: { high: number; low: number; close: number }[], period: number): number[] {
+  const tr: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    tr.push(Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close)
+    ));
+  }
+  const result: number[] = [];
+  const k = 1 / period;
+  let prev = tr.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  result.push(prev);
+  for (let i = period; i < tr.length; i++) {
+    prev = tr[i] * k + prev * (1 - k);
+    result.push(prev);
+  }
+  return result;
+}
+
+// ─── Trend direction helper (EMA 200) ───────────────────────────────────────
+function getTrend(closes: number[], period = 200): "bullish" | "bearish" | "neutral" {
+  if (closes.length < period + 5) return "neutral";
+  const emaVals = computeEMA(closes, period);
+  const currentPrice = closes[closes.length - 1];
+  const currentEma = emaVals[emaVals.length - 1];
+  if (currentPrice === undefined || currentEma === undefined) return "neutral";
+  const prevEma = emaVals[emaVals.length - 3];
+  if (prevEma === undefined) return "neutral";
+  const slope = (currentEma - prevEma) / prevEma;
+  if (currentPrice > currentEma && slope > -0.001) return "bullish";
+  if (currentPrice < currentEma && slope < 0.001) return "bearish";
+  return "neutral";
+}
+
+function computeEMA(closes: number[], period: number): number[] {
+  const result: number[] = [];
+  const k = 2 / (period + 1);
+  let prev = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  result.push(prev);
+  for (let i = period; i < closes.length; i++) {
+    prev = closes[i] * k + prev * (1 - k);
+    result.push(prev);
+  }
+  return result;
+}
+
 // Default exit rules (fallback quando la strategia non ha parametri)
 const DEFAULT_EXIT_RULES = {
   takeProfitPct: 2.0,
@@ -29,6 +77,35 @@ interface ExitRules {
   trailingDistancePct: number;
 }
 
+/** 
+ * Calcola lo stop loss dinamico usando Opzione A: max(SL%, ATR × 1.5)
+ * Recupera le candele 4h per calcolare l'ATR sul timeframe corretto.
+ */
+async function getDynamicStopPct(
+  asset: string,
+  entryPrice: number,
+  baseSlPct: number,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 1.5
+): Promise<number> {
+  try {
+    const now = new Date();
+    const from = new Date(now.getTime() - (atrPeriod + 5) * 4 * 3600 * 1000); // (period+5) barre 4h
+    const candles = await getCandles(asset, "4h", from, now, "bitget");
+    if (candles.length < atrPeriod + 2) return baseSlPct; // fallback a SL fisso
+
+    const atrVals = computeATR(candles, atrPeriod);
+    const currentAtr = atrVals[atrVals.length - 1] ?? 0;
+    const atrPct = (currentAtr * atrMultiplier) / entryPrice * 100;
+
+    // Opzione A: max(SL fisso %, ATR × 1.5 in %)
+    const dynamicSl = Math.max(baseSlPct, atrPct);
+    return Math.round(dynamicSl * 100) / 100;
+  } catch {
+    return baseSlPct; // fallback silenzioso
+  }
+}
+
 /**
  * Legge i parametri SL/TP dalla strategia se presenti, altrimenti usa default
  */
@@ -42,16 +119,19 @@ async function getExitRulesForTrade(tradeId: number): Promise<ExitRules> {
 
     const params = JSON.parse(strat.parametersJson || "{}");
 
-    // Cerca sl/tp nei parametri con vari nomi possibili
     const sl = params.slPct ?? params.sl ?? params.stopLossPct ?? null;
     const tp = params.tpPct ?? params.tp ?? params.takeProfitPct ?? null;
-
-    // time exit dai parametri
     const timeH = params.timeExit ?? params.timeExitHours ?? null;
+
+    // ── ATR Dynamic Stop: calcola lo stop effettivo ───────────────────────
+    let effectiveSl = sl ?? DEFAULT_EXIT_RULES.stopLossPct;
+    if (trade.entryPrice) {
+      effectiveSl = await getDynamicStopPct(trade.asset, trade.entryPrice, effectiveSl);
+    }
 
     return {
       takeProfitPct: tp ?? DEFAULT_EXIT_RULES.takeProfitPct,
-      stopLossPct: sl ?? DEFAULT_EXIT_RULES.stopLossPct,
+      stopLossPct: effectiveSl,
       timeExitHours: timeH ?? DEFAULT_EXIT_RULES.timeExitHours,
       trailingActivatePct: DEFAULT_EXIT_RULES.trailingActivatePct,
       trailingDistancePct: DEFAULT_EXIT_RULES.trailingDistancePct,
@@ -221,6 +301,49 @@ export async function updatePaperTradePnl(
       highestPrice,
       lowestPrice,
     );
+
+    // ── Trend Exit: chiudi prima dello SL se il trend è cambiato ──────────
+    if (!exitCheck.shouldClose && candles.length >= 210) {
+      const trendCloses = candles.map(c => c.close);
+      let trendCheck: ReturnType<typeof getTrend>;
+      try {
+        trendCheck = getTrend(trendCloses, 200);
+      } catch {
+        trendCheck = "neutral";
+      }
+
+      const isTrendSided = trendCheck !== "neutral";
+      const pnlPct = t.side === "long"
+        ? (currentPrice - t.entryPrice) / t.entryPrice * 100
+        : (t.entryPrice - currentPrice) / t.entryPrice * 100;
+
+      if (isTrendSided) {
+        // LONG in bearish trend → chiudi se il trade è già in negativo
+        if (t.side === "long" && trendCheck === "bearish" && pnlPct < -1.0) {
+          await closePaperTrade(tradeId, currentPrice);
+          const closedTrade2 = await db.select().from(paperTrades).where(eq(paperTrades.id, tradeId)).limit(1);
+          if (closedTrade2.length > 0) {
+            const ct2 = closedTrade2[0];
+            let strategyName2 = "?";
+            try { const str2 = await db.select().from(strategies).where(eq(strategies.id, ct2.strategyId)).limit(1); if (str2.length > 0) strategyName2 = str2[0].name; } catch {}
+            await sendTelegram(formatTradeClose(tradeId, ct2.asset, ct2.side as "long" | "short", t.entryPrice, currentPrice, ct2.realizedPnl || 0, "trend_exit", strategyName2));
+          }
+          return { closed: true, reason: "trend_exit" };
+        }
+        // SHORT in bullish trend → chiudi se il trade è già in negativo
+        if (t.side === "short" && trendCheck === "bullish" && pnlPct < -1.0) {
+          await closePaperTrade(tradeId, currentPrice);
+          const closedTrade3 = await db.select().from(paperTrades).where(eq(paperTrades.id, tradeId)).limit(1);
+          if (closedTrade3.length > 0) {
+            const ct3 = closedTrade3[0];
+            let strategyName3 = "?";
+            try { const str3 = await db.select().from(strategies).where(eq(strategies.id, ct3.strategyId)).limit(1); if (str3.length > 0) strategyName3 = str3[0].name; } catch {}
+            await sendTelegram(formatTradeClose(tradeId, ct3.asset, ct3.side as "long" | "short", t.entryPrice, currentPrice, ct3.realizedPnl || 0, "trend_exit", strategyName3));
+          }
+          return { closed: true, reason: "trend_exit" };
+        }
+      }
+    }
 
     if (exitCheck.shouldClose) {
       await closePaperTrade(tradeId, exitCheck.exitPrice);
