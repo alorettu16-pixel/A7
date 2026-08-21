@@ -14,16 +14,20 @@ export async function GET() {
     const dj = t.decisionJournalId ? await db.select().from(decisionJournal).where(eq(decisionJournal.id, t.decisionJournalId)).limit(1) : [];
     const snapshots = await db.select().from(pnlSnapshots).where(eq(pnlSnapshots.paperTradeId, t.id)).orderBy(desc(pnlSnapshots.collectedAt)).limit(50);
 
-    // Extract timeExitHours + SL/TP from strategy parameters
+    // Extract timeExitHours + SL/TP + sizing from strategy parameters
     let timeExitHours = 96;
     let slPct = 2;
     let tpPct = 4;
+    let sizingMode = "fixed";
+    let sizingValue = 100;
     if (strat[0]?.parametersJson) {
       try {
         const params = JSON.parse(strat[0].parametersJson);
         timeExitHours = params.timeExitHours ?? 96;
         slPct = params.sl ?? 2;
         tpPct = params.tp ?? 4;
+        sizingMode = params.sizing_mode || "fixed";
+        sizingValue = params.sizing_value || 100;
       } catch {}
     }
 
@@ -35,6 +39,8 @@ export async function GET() {
       timeExitHours,
       slPct,
       tpPct,
+      sizingMode,
+      sizingValue,
     });
   }
 

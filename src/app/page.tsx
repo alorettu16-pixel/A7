@@ -141,6 +141,7 @@ interface OverviewData {
   totalPnl: number;
   realizedPnl: number;
   unrealizedPnl: number;
+  totalBudget: number;
   activeStrategies: number;
   openPositions: number;
   signalsToday: number;
@@ -295,7 +296,7 @@ export default function HomePage() {
 
   // --- MAIN DASHBOARD ---
   const o = overview || {
-    totalPnl: 0, realizedPnl: 0, unrealizedPnl: 0,
+    totalPnl: 0, realizedPnl: 0, unrealizedPnl: 0, totalBudget: 500,
     activeStrategies: 0, openPositions: 0, signalsToday: 0,
     webhooksToday: 0, liveTradingEnabled: false, budgetDemo: 500,
     avgDeviation: 0, equityCurve: [],
@@ -333,10 +334,14 @@ export default function HomePage() {
 
       {/* KPI Cards — prima riga: saldo + statistiche chiave */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Budget Demo + PnL */}
+        {/* Budget Demo + Totale + PnL */}
         <div className="glass-card p-5 md:col-span-1">
           <div className="text-xs text-[#64748b] uppercase tracking-wider mb-1">Budget Demo</div>
           <div className="text-3xl font-bold text-white">${o.budgetDemo.toLocaleString()}</div>
+          <div className="text-xs text-[#64748b] mt-1">
+            <Wallet size={12} className="inline mr-1 text-indigo-400" />
+            <span className="text-indigo-300 font-semibold">${o.totalBudget.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span> disponibili
+          </div>
           <div className={`flex items-center gap-1.5 mt-2 ${isGreen ? "text-green-400" : "text-red-400"}`}>
             {isGreen ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
             <span className="font-semibold">{isGreen ? "+" : ""}{totalPnl.toFixed(2)}$</span>
@@ -528,7 +533,16 @@ export default function HomePage() {
                     <div>Entry: <span className="text-white">${t.entryPrice.toFixed(2)}</span></div>
                     <div>Corrente: <span className="text-white">${t.currentPrice.toFixed(2)}</span></div>
                     <div>Size: <span className="text-white">${t.simulatedPositionSize.toFixed(2)}</span></div>
-                    <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        (t as any).sizingMode === 'percent'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : 'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {(t as any).sizingMode === 'percent'
+                          ? `${(t as any).sizingValue}%`
+                          : `${(t as any).sizingValue}$`}
+                      </span>
                       <CountdownTimer endMs={endMs} maxHours={maxHours} />
                     </div>
                   </div>

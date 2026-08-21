@@ -41,6 +41,7 @@ export async function GET() {
     totalPnl: Math.round(totalPnl * 100) / 100,
     realizedPnl: Math.round(realizedPnl * 100) / 100,
     unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
+    totalBudget: Math.round((budgetDemo + realizedPnl) * 100) / 100,
     activeStrategies: active.length,
     openPositions,
     signalsToday: signalsToday.length,

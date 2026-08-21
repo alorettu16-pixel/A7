@@ -158,7 +158,25 @@ async function main() {
             totalSignals = -999;
             return;
           }
-          const actualSize = Math.min(positionSize, remainingBudget);
+
+          // ── Sizing dinamico: fixed vs percent ────────────────────────────
+          let desiredSize = positionSize; // default: fixed globale
+          try {
+            const params = JSON.parse(s.parametersJson);
+            const sizingMode = params.sizing_mode || "fixed";
+            const sizingValue = params.sizing_value || 100;
+            if (sizingMode === "percent") {
+              // percentuale del budget totale (budgetDemo + realized PnL)
+              const currentBudget = demoBudget + allTimePnl;
+              desiredSize = currentBudget * (sizingValue / 100);
+            } else {
+              // fixed: usa il valore direttamente
+              desiredSize = sizingValue;
+            }
+          } catch { /* ignora */ }
+
+          // Cap alla remainingBudget e al maxPositionSize globale
+          const actualSize = Math.min(desiredSize, remainingBudget, maxPositionSize);
 
           const decision = await db.insert(decisionJournal).values({
             strategySignalId: undefined,
