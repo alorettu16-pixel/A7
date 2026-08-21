@@ -9,6 +9,7 @@ export async function GET() {
       id: null, liveTradingEnabled: false, maxDailyDrawdownPct: 10, maxPositionSizeUsd: 100,
       maxTotalExposureUsd: 500, maxLeverageAllowed: 1, demoBudgetUsd: 10000,
       allowedStrategies: [], allowedBrokers: [], killSwitchActive: false,
+      globalSizingMode: "fixed", globalSizingValue: 100,
     });
   }
   const l = limits[0];
@@ -22,6 +23,8 @@ export async function GET() {
     allowedStrategies: JSON.parse(l.allowedStrategiesJson || "[]"),
     allowedBrokers: JSON.parse(l.allowedBrokersJson || "[]"),
     killSwitchActive: l.killSwitchActive,
+    globalSizingMode: l.globalSizingMode || "fixed",
+    globalSizingValue: l.globalSizingValue ?? 100,
   });
 }
 
@@ -40,6 +43,8 @@ export async function PUT(request: Request) {
     maxTotalExposureUsd: body.maxTotalExposureUsd ?? l.maxTotalExposureUsd,
     maxLeverageAllowed: body.maxLeverageAllowed ?? l.maxLeverageAllowed,
     demoBudgetUsd: body.demoBudgetUsd ?? l.demoBudgetUsd,
+    globalSizingMode: body.globalSizingMode ?? l.globalSizingMode,
+    globalSizingValue: body.globalSizingValue ?? l.globalSizingValue,
   }).where(eq(riskLimits.id, l.id)).run();
 
   return NextResponse.json({ ok: true });

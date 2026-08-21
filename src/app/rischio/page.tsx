@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, Shield, Save, DollarSign } from "lucide-react";
+import { RefreshCw, Shield, Save, DollarSign, Sliders } from "lucide-react";
 
 interface RiskData {
   id: number | null;
@@ -13,6 +13,8 @@ interface RiskData {
   allowedStrategies: string[];
   allowedBrokers: string[];
   killSwitchActive: boolean;
+  globalSizingMode: string;
+  globalSizingValue: number;
 }
 
 export default function RischioPage() {
@@ -80,6 +82,51 @@ export default function RischioPage() {
             className="bg-[#0a0a1a] border border-[#1e1e3a] rounded-lg px-4 py-2 text-white text-lg font-bold w-40 focus:border-indigo-500 focus:outline-none"
           />
           <span className="text-[#94a3b8]">$ — capitale virtuale per il paper trading</span>
+        </div>
+      </div>
+
+      {/* Sizing Mode — Fixed / Percent */}
+      <div className="glass-card p-4 mb-4">
+        <div className="flex items-center gap-2 mb-4">
+          <Sliders size={18} className="text-purple-400" />
+          <h2 className="text-white font-semibold">Dimensione Operazione</h2>
+        </div>
+        <div className="flex items-center gap-4 mb-3">
+          <button
+            onClick={() => setLimits(prev => prev ? { ...prev, globalSizingMode: "fixed" } : prev)}
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+              limits?.globalSizingMode === "fixed"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                : "bg-[#1e1e3a] text-[#64748b] hover:bg-[#2a2a4a]"
+            }`}
+          >
+            Importo Fisso
+          </button>
+          <button
+            onClick={() => setLimits(prev => prev ? { ...prev, globalSizingMode: "percent" } : prev)}
+            className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+              limits?.globalSizingMode === "percent"
+                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                : "bg-[#1e1e3a] text-[#64748b] hover:bg-[#2a2a4a]"
+            }`}
+          >
+            Percentuale Budget
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            step={limits?.globalSizingMode === "percent" ? "0.5" : "10"}
+            value={limits?.globalSizingValue ?? 100}
+            onChange={e => setLimits(prev => prev ? { ...prev, globalSizingValue: Number(e.target.value) } : prev)}
+            className="bg-[#0a0a1a] border border-[#1e1e3a] rounded-lg px-3 py-2 text-white text-sm w-24 focus:border-indigo-500 focus:outline-none"
+          />
+          <span className="text-[#94a3b8] text-sm">
+            {limits?.globalSizingMode === "percent" ? "% del budget totale per operazione" : "$ per operazione"}
+          </span>
+        </div>
+        <div className="mt-3 text-xs text-[#64748b] bg-[#0a0a1a] rounded-lg p-3">
+          <strong className="text-indigo-300">Nota:</strong> I trade attualmente aperti continuano con la dimensione al momento dell'apertura. Solo i <strong>nuovi</strong> trade useranno questa impostazione.
         </div>
       </div>
 

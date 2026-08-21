@@ -159,19 +159,20 @@ async function main() {
             return;
           }
 
-          // ── Sizing dinamico: fixed vs percent ────────────────────────────
-          let desiredSize = positionSize; // default: fixed globale
+          // ── Sizing globale: legge da risk_limits ────────────────────────────────
+          let desiredSize = positionSize; // default: cap globale
           try {
-            const params = JSON.parse(s.parametersJson);
-            const sizingMode = params.sizing_mode || "fixed";
-            const sizingValue = params.sizing_value || 100;
-            if (sizingMode === "percent") {
-              // percentuale del budget totale (budgetDemo + realized PnL)
-              const currentBudget = demoBudget + allTimePnl;
-              desiredSize = currentBudget * (sizingValue / 100);
-            } else {
-              // fixed: usa il valore direttamente
-              desiredSize = sizingValue;
+            const riskRows = await db.select().from(riskLimits).limit(1);
+            if (riskRows.length > 0) {
+              const r = riskRows[0];
+              const sizingMode = r.globalSizingMode || "fixed";
+              const sizingValue = r.globalSizingValue ?? 100;
+              if (sizingMode === "percent") {
+                const currentBudget = demoBudget + allTimePnl;
+                desiredSize = currentBudget * (sizingValue / 100);
+              } else {
+                desiredSize = sizingValue;
+              }
             }
           } catch { /* ignora */ }
 

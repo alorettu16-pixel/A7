@@ -218,6 +218,8 @@ export const riskLimits = sqliteTable("risk_limits", {
   allowedBrokersJson: text("allowed_brokers_json").notNull().default("[]"),
   demoBudgetUsd: real("demo_budget_usd").notNull().default(10000),
   killSwitchActive: integer("kill_switch_active", { mode: "boolean" }).notNull().default(false),
+  globalSizingMode: text("global_sizing_mode").notNull().default("fixed"),
+  globalSizingValue: real("global_sizing_value").notNull().default(100),
   lastModifiedBy: text("last_modified_by").notNull().default("manual"),
   updatedAt: text("updated_at").notNull().default(sql`(current_timestamp)`),
 });
