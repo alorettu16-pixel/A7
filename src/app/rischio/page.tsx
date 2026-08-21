@@ -41,6 +41,8 @@ export default function RischioPage() {
           maxTotalExposureUsd: limits.maxTotalExposureUsd,
           maxLeverageAllowed: limits.maxLeverageAllowed,
           demoBudgetUsd: limits.demoBudgetUsd,
+          globalSizingMode: limits.globalSizingMode,
+          globalSizingValue: limits.globalSizingValue,
         }),
       });
       const d = await res.json();
