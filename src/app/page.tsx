@@ -393,7 +393,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="text-[10px] text-[#64748b] uppercase tracking-wider">
-            <span className="text-gray-400">{o.signalsToday > 0 ? "attivo" : "nessuna attività"}</span>
+            <span className="text-yellow-400">{o.signalsToday} segnali</span>
           </div>
         </div>
       </div>
