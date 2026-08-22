@@ -82,7 +82,7 @@ async function main() {
   // ─── Reverse Signal + Generazione ────────────────────────────────────────
   // MACD LONG+SHORT ottimizzate per 4h
   const TF = "4h";
-  const LOOKBACK_HOURS = 720; // 30gg per avere abbastanza candele 4h (~180)
+  const LOOKBACK_HOURS = 900; // 37.5gg per avere abbastanza candele 4h (~225) per EMA200 + warmup
 
   const checkAsset = async (asset: string, assetOpen: Set<number>) => {
     console.log(`\n🔍 ${asset} ${TF}...`);
