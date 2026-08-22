@@ -1,4 +1,4 @@
-import db, { strategies, paperTrades, strategySignals, tradingViewWebhookLogs, riskLimits, equitySnapshots } from "@/db";
+import db, { strategies, paperTrades, decisionJournal, tradingViewWebhookLogs, riskLimits, equitySnapshots } from "@/db";
 import { eq, desc, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -20,7 +20,7 @@ export async function GET() {
   const openPositions = allTrades.filter(t => t.status === "open").length;
 
   const todayStart = new Date().toISOString().split("T")[0] + "T00:00:00.000Z";
-  const signalsToday = await db.select().from(strategySignals).where(gte(strategySignals.createdAt, todayStart));
+  const signalsToday = await db.select().from(decisionJournal).where(gte(decisionJournal.createdAt, todayStart));
   const webhookToday = await db.select().from(tradingViewWebhookLogs).where(gte(tradingViewWebhookLogs.receivedAt, todayStart));
 
   const totalStrategies = await db.select().from(strategies);
