@@ -1,4 +1,4 @@
-import db, { paperTrades, strategies, decisionJournal, pnlSnapshots } from "@/db";
+import db, { paperTrades, strategies, decisionJournal, pnlSnapshots, riskLimits } from "@/db";
 import { eq, asc, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -14,7 +14,7 @@ export async function GET() {
     const dj = t.decisionJournalId ? await db.select().from(decisionJournal).where(eq(decisionJournal.id, t.decisionJournalId)).limit(1) : [];
     const snapshots = await db.select().from(pnlSnapshots).where(eq(pnlSnapshots.paperTradeId, t.id)).orderBy(desc(pnlSnapshots.collectedAt)).limit(50);
 
-    // Extract timeExitHours + SL/TP + sizing from strategy parameters
+    // Extract timeExitHours + SL/TP from strategy parameters
     let timeExitHours = 96;
     let slPct = 2;
     let tpPct = 4;
@@ -26,10 +26,17 @@ export async function GET() {
         timeExitHours = params.timeExitHours ?? 96;
         slPct = params.sl ?? 2;
         tpPct = params.tp ?? 4;
-        sizingMode = params.sizing_mode || "fixed";
-        sizingValue = params.sizing_value || 100;
       } catch {}
     }
+
+    // Legge global sizing mode da risk_limits (è quello effettivamente usato)
+    try {
+      const riskRows = await db.select().from(riskLimits).limit(1);
+      if (riskRows.length > 0) {
+        sizingMode = riskRows[0].globalSizingMode || "fixed";
+        sizingValue = riskRows[0].globalSizingValue ?? 100;
+      }
+    } catch {}
 
     enriched.push({
       ...t,
