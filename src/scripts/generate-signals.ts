@@ -170,7 +170,7 @@ async function main() {
               const sizingValue = r.globalSizingValue ?? 100;
               if (sizingMode === "percent") {
                 const currentBudget = demoBudget + allTimePnl;
-                desiredSize = currentBudget * (sizingValue / 100);
+                desiredSize = Math.round(currentBudget * (sizingValue / 100) * 100) / 100;
               } else {
                 desiredSize = sizingValue;
               }
