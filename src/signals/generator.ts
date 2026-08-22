@@ -22,8 +22,12 @@ function getTrend(closes: number[], period = 200): "bullish" | "bearish" | "neut
   const prevEma = emaVals[emaVals.length - 3];
   if (prevEma === undefined) return "neutral";
   const slope = (currentEma - prevEma) / prevEma;
-  if (currentPrice > currentEma && slope > -0.001) return "bullish";
-  if (currentPrice < currentEma && slope < 0.001) return "bearish";
+  if (currentPrice > currentEma && slope > 0) return "bullish";
+  if (currentPrice < currentEma && slope < 0) return "bearish";
+  // Prezzo sopra EMA: bullish anche se pendenza zero (mercato salito)
+  if (currentPrice > currentEma) return "bullish";
+  // Prezzo sotto EMA: bearish anche se pendenza zero (mercato sceso)
+  if (currentPrice < currentEma) return "bearish";
   return "neutral";
 }
 

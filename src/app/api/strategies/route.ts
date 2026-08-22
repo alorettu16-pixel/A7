@@ -26,6 +26,30 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
+// ─── PATCH: toggla lo status di una strategia (paper_active ↔ research) ───
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return NextResponse.json({ error: "id e status richiesti" }, { status: 400 });
+    }
+
+    const validStatuses = ["research", "backtesting", "paper_active", "watch", "rejected", "live_eligible"];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ error: `Status non valido: ${status}` }, { status: 400 });
+    }
+
+    await db.update(strategies).set({ status }).where(eq(strategies.id, id)).run();
+
+    return NextResponse.json({ ok: true, id, status });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
