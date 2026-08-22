@@ -180,10 +180,10 @@ async function main() {
 
           // Applica leva: la dimensione collaterale rimane desiredSize,
           // ma l'esposizione effettiva (e il PnL) viene scalata dalla leva
-          const effectiveExposure = desiredSize * leverage;
+          const effectiveExposure = Math.round(desiredSize * leverage);
 
           // Cap alla remainingBudget e al maxPositionSize globale
-          const actualSize = Math.min(effectiveExposure, remainingBudget, maxPositionSize);
+          const actualSize = Math.round(Math.min(effectiveExposure, remainingBudget, maxPositionSize));
 
           const decision = await db.insert(decisionJournal).values({
             strategySignalId: undefined,
