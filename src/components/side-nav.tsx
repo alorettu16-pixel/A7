@@ -36,7 +36,7 @@ export function SideNav() {
         </Link>
       </div>
 
-      <div className="p-3 space-y-1">
+      <div className="p-3 space-y-1 pb-20">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -57,7 +57,7 @@ export function SideNav() {
         })}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#1e1e3a]">
+      <div className="p-4 border-t border-[#1e1e3a]">
         <div className="text-xs text-[#94a3b8]">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
