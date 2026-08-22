@@ -161,6 +161,7 @@ async function main() {
 
           // ── Sizing globale: legge da risk_limits ────────────────────────────────
           let desiredSize = positionSize; // default: cap globale
+          let leverage = 1;
           try {
             const riskRows = await db.select().from(riskLimits).limit(1);
             if (riskRows.length > 0) {
@@ -173,11 +174,16 @@ async function main() {
               } else {
                 desiredSize = sizingValue;
               }
+              leverage = r.maxLeverageAllowed || 1;
             }
           } catch { /* ignora */ }
 
+          // Applica leva: la dimensione collaterale rimane desiredSize,
+          // ma l'esposizione effettiva (e il PnL) viene scalata dalla leva
+          const effectiveExposure = desiredSize * leverage;
+
           // Cap alla remainingBudget e al maxPositionSize globale
-          const actualSize = Math.min(desiredSize, remainingBudget, maxPositionSize);
+          const actualSize = Math.min(effectiveExposure, remainingBudget, maxPositionSize);
 
           const decision = await db.insert(decisionJournal).values({
             strategySignalId: undefined,
