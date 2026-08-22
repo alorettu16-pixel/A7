@@ -381,7 +381,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Segnali & Webhook */}
+        {/* Segnali Oggi */}
         <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-9 h-9 rounded-lg bg-yellow-500/20 flex items-center justify-center">
@@ -393,7 +393,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="text-[10px] text-[#64748b] uppercase tracking-wider">
-            <span className="text-yellow-400">{o.webhooksToday} webhook</span> · <span className="text-gray-400">{(o.signalsToday + o.webhooksToday) > 0 ? "attivo" : "nessuna attività"}</span>
+            <span className="text-gray-400">{o.signalsToday > 0 ? "attivo" : "nessuna attività"}</span>
           </div>
         </div>
       </div>

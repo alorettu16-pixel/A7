@@ -46,7 +46,7 @@ const sections = [
     icon: Receipt,
     content: [
       "Elenco completo di tutte le operazioni di paper trading eseguite dal sistema. Ogni trade mostra: ID, asset, direzione, prezzo d'entrata, prezzo corrente, dimensione della posizione, PnL realizzato/non realizzato, strategia, data di apertura e chiusura.",
-      "I trade aperti sono evidenziati con barre di progresso SL/TP e timer di scadenza (48h massime). I trade chiusi mostrano il PnL finale e il motivo di chiusura (stop_loss, take_profit, trend_exit, trailing_stop, time_exit).",
+      "I trade aperti sono evidenziati con barre di progresso SL/TP e timer di scadenza (96h massime). I trade chiusi mostrano il PnL finale e il motivo di chiusura (stop_loss, take_profit, trend_exit, trailing_stop, time_exit).",
       "Dalla dashboard principale, la card Posizioni Aperte mostra anche il badge di sizing (importo fisso o percentuale) e il conto alla rovescia per la scadenza."
     ]
   },
