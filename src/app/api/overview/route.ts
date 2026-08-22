@@ -19,7 +19,7 @@ export async function GET() {
   const active = await db.select().from(strategies).where(eq(strategies.status, "paper_active"));
   const openPositions = allTrades.filter(t => t.status === "open").length;
 
-  const todayStart = new Date().toISOString().split("T")[0] + "T00:00:00.000Z";
+  const todayStart = new Date().toISOString().split("T")[0] + " 00:00:00";
   const signalsToday = await db.select().from(decisionJournal).where(gte(decisionJournal.createdAt, todayStart));
   const webhookToday = await db.select().from(tradingViewWebhookLogs).where(gte(tradingViewWebhookLogs.receivedAt, todayStart));
 
