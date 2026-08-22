@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, TrendingUp, LayoutGrid, Webhook, Zap, Receipt, BookOpen, BarChart3, Sliders, Shield, FileText, Calendar } from "lucide-react";
+import { Home, TrendingUp, LayoutGrid, HelpCircle, Zap, Receipt, BookOpen, BarChart3, Sliders, Shield, FileText, Calendar } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Panoramica", icon: Home },
   { href: "/strategie", label: "Libreria Strategie", icon: LayoutGrid },
   { href: "/builder", label: "Strategy Builder", icon: TrendingUp },
-  { href: "/webhooks", label: "Webhook TradingView", icon: Webhook },
+  { href: "/come-funziona", label: "Come funziona A7", icon: HelpCircle },
   { href: "/segnali", label: "Segnali Live", icon: Zap },
   { href: "/paper-trades", label: "Paper Trades", icon: Receipt },
   { href: "/diario", label: "Diario Decisioni", icon: BookOpen },
