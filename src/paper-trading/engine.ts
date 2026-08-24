@@ -78,13 +78,16 @@ interface ExitRules {
 }
 
 /** 
- * Calcola lo stop loss dinamico usando Opzione A: max(SL%, ATR × 1.5)
+ * Calcola lo stop loss dinamico usando ATR.
+ * Long: max(SL%, ATR × 1.5) — SL più largo in alta volatilità (trend favorevole)
+ * Short: min(SL%, ATR × 1.5) — SL più stretto in alta volatilità (trend contrario)
  * Recupera le candele 4h per calcolare l'ATR sul timeframe corretto.
  */
 async function getDynamicStopPct(
   asset: string,
   entryPrice: number,
   baseSlPct: number,
+  side: "long" | "short" = "long",
   atrPeriod: number = 14,
   atrMultiplier: number = 1.5
 ): Promise<number> {
@@ -98,7 +101,12 @@ async function getDynamicStopPct(
     const currentAtr = atrVals[atrVals.length - 1] ?? 0;
     const atrPct = (currentAtr * atrMultiplier) / entryPrice * 100;
 
-    // Opzione A: max(SL fisso %, ATR × 1.5 in %)
+    if (side === "short") {
+      // Short: volatilità alta = rischio maggiore vs trend → SL più stretto
+      const dynamicSl = Math.min(baseSlPct, atrPct);
+      return Math.round(dynamicSl * 100) / 100;
+    }
+    // Long: volatilità alta = movimento normale in trend favorevole → SL più largo
     const dynamicSl = Math.max(baseSlPct, atrPct);
     return Math.round(dynamicSl * 100) / 100;
   } catch {
@@ -126,7 +134,7 @@ async function getExitRulesForTrade(tradeId: number): Promise<ExitRules> {
     // ── ATR Dynamic Stop: calcola lo stop effettivo ───────────────────────
     let effectiveSl = sl ?? DEFAULT_EXIT_RULES.stopLossPct;
     if (trade.entryPrice) {
-      effectiveSl = await getDynamicStopPct(trade.asset, trade.entryPrice, effectiveSl);
+      effectiveSl = await getDynamicStopPct(trade.asset, trade.entryPrice, effectiveSl, trade.side as "long" | "short");
     }
 
     return {
