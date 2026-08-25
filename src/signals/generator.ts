@@ -12,7 +12,7 @@ export interface GeneratedSignal {
 }
 
 // ─── Trend direction helper ──────────────────────────────────────────────────
-function getTrend(closes: number[], period = 200): "bullish" | "bearish" | "neutral" {
+function getTrend(closes: number[], period = 100): "bullish" | "bearish" | "neutral" {
   if (closes.length < period + 5) return "neutral";
   const emaVals = computeEMA(closes, period);
   const currentPrice = closes[closes.length - 1];
@@ -303,23 +303,25 @@ export async function generateSignals(
     sidesToCheck = ["long", "short"];
   }
 
-  // ─── Trend Filter (EMA200) ───────────────────────────────────────────────
-  const trend = getTrend(closes, 200);
+  // ─── Trend Filter (EMA100) ───────────────────────────────────────────────
+  const trend = getTrend(closes, 100);
   const skipLong = trend === "bearish";
   const skipShort = trend === "bullish";
 
   for (const checkSide of sidesToCheck) {
     // Skip entries against the trend
     if (checkSide === "long" && skipLong) {
-      console.log(`   ⏸ ${asset} MACD: skip LONG (trend bearish, price sotto EMA200)`);
+      console.log(`   ⏸ ${asset} MACD: skip LONG (trend bearish, price sotto EMA100)`);
       continue;
     }
     if (checkSide === "short" && skipShort) {
-      console.log(`   ⏸ ${asset} MACD: skip SHORT (trend bullish, price sopra EMA200)`);
+      console.log(`   ⏸ ${asset} MACD: skip SHORT (trend bullish, price sopra EMA100)`);
       continue;
     }
 
-    for (let i = Math.max(5, latestCandles.length - 5); i < latestCandles.length; i++) {
+    // Valuta il segnale SOLO sull'ultima candela 4h chiusa (candles.length-2),
+    // non sulle ultime 5. Questo evita falsi segnali intra-candela.
+    for (let i = Math.max(6, latestCandles.length - 2); i < latestCandles.length; i++) {
       const allEntry = rules.entry.every((e) => {
         const val = getIndicatorValue(e, closes, i, cache, latestCandles);
         if (val === null) return false;
