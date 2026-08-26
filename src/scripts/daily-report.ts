@@ -20,8 +20,9 @@ async function main() {
   const closedTrades = allTrades.filter(t => t.status === "closed");
 
   // ─── PnL ───────────────────────────────────────────────
-  const totalPnl = allTrades.reduce((s, t) => s + (t.realizedPnl || 0), 0);
+  const realizedPnl = allTrades.reduce((s, t) => s + (t.realizedPnl || 0), 0);
   const openPnl = openTrades.reduce((s, t) => s + (t.unrealizedPnl || 0), 0);
+  const totalPnl = realizedPnl + openPnl;
   const todayPnl = todayTrades.reduce((s, t) => s + (t.realizedPnl || 0), 0);
   const wins = closedTrades.filter(t => (t.realizedPnl || 0) > 0).length;
   const losses = closedTrades.filter(t => (t.realizedPnl || 0) < 0).length;
@@ -70,8 +71,8 @@ async function main() {
 
   // ─── Equity snapshot ──────────────────────────────────
   db.insert(equitySnapshots).values({
-    totalPnl: totalPnl + openPnl,
-    realizedPnl: totalPnl,
+    totalPnl: realizedPnl + openPnl,
+    realizedPnl: realizedPnl,
     unrealizedPnl: openPnl,
     openCount: openTrades.length,
     closedCount: closedTrades.length,
