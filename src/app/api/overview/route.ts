@@ -30,6 +30,10 @@ export async function GET() {
   const liveTradingEnabled = limits.length > 0 ? limits[0].liveTradingEnabled : false;
   const budgetDemo = limits.length > 0 ? limits[0].demoBudgetUsd : 10000;
 
+  // Esposizione totale (somma size posizioni aperte)
+  const openTradeList = allTrades.filter(t => t.status === "open");
+  const totalExposure = openTradeList.reduce((sum, t) => sum + (t.simulatedPositionSize || 0), 0);
+
   const snapshots = await db
     .select()
     .from(equitySnapshots)
@@ -44,6 +48,7 @@ export async function GET() {
     totalBudget: Math.round((budgetDemo + realizedPnl) * 100) / 100,
     activeStrategies: active.length,
     openPositions,
+    totalExposure: Math.round(totalExposure * 100) / 100,
     signalsToday: signalsToday.length,
     webhooksToday: webhookToday.length,
     liveTradingEnabled,

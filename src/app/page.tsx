@@ -470,9 +470,14 @@ export default function HomePage() {
             <Activity size={18} className="text-indigo-400" />
             Posizioni Aperte ({o.openPositions})
           </h2>
-          <a href="/paper-trades" className="text-indigo-400 hover:text-indigo-300 text-sm flex items-center gap-1">
-            Vedi tutte →
-          </a>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-[#94a3b8]">
+              Esposizione: <span className="text-yellow-400 font-semibold">${(o as any).totalExposure?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) ?? "0.00"}</span>
+            </span>
+            <a href="/paper-trades" className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+              Vedi tutte →
+            </a>
+          </div>
         </div>
 
         {openTrades.length === 0 ? (
