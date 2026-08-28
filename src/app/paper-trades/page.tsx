@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, TrendingUp, TrendingDown, Activity, Timer } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, Activity, Timer, XCircle } from "lucide-react";
 
 interface TradeData {
   id: number; strategyId: number; asset: string; side: string;
@@ -53,14 +53,15 @@ export default function PaperTradesPage() {
   const [trades, setTrades] = useState<TradeData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchTrades = async () => {
+    try {
+      const res = await fetch("/api/trades");
+      setTrades(await res.json());
+    } catch {}
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchTrades = async () => {
-      try {
-        const res = await fetch("/api/trades");
-        setTrades(await res.json());
-      } catch {}
-      setLoading(false);
-    };
     fetchTrades();
     const iv = setInterval(fetchTrades, 15000);
     return () => clearInterval(iv);
@@ -137,6 +138,19 @@ export default function PaperTradesPage() {
                     </div>
                   </div>
                   <div className="text-xs text-[#64748b] mt-2">Aperto: {new Date(t.openedAt).toLocaleString()} · {t.strategyName}</div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Chiudere manualmente il trade #" + t.id + "?")) return;
+                      try {
+                        await fetch("/api/trades/" + t.id + "/close", { method: "POST" });
+                        fetchTrades();
+                      } catch {}
+                    }}
+                    className="mt-2 flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    <XCircle size={12} />
+                    Chiudi manualmente
+                  </button>
                 </div>
               );
             })}

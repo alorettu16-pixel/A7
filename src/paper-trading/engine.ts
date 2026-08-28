@@ -1,4 +1,4 @@
-import db, { paperTrades, pnlSnapshots, strategies } from "@/db";
+import db, { paperTrades, pnlSnapshots, strategies, decisionJournal } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { getCandles } from "@/market-data";
 import { sendTelegram, formatTradeClose } from "@/lib/telegram";
@@ -354,7 +354,7 @@ export async function updatePaperTradePnl(
     }
 
     if (exitCheck.shouldClose) {
-      await closePaperTrade(tradeId, exitCheck.exitPrice);
+      await closePaperTrade(tradeId, exitCheck.exitPrice, exitCheck.reason);
 
       // Notifica Telegram per la chiusura
       const closedTrade = await db
@@ -392,7 +392,8 @@ export async function updatePaperTradePnl(
 
 export async function closePaperTrade(
   tradeId: number,
-  exitPrice: number
+  exitPrice: number,
+  reason?: string,
 ): Promise<void> {
   const trade = await db
     .select()
@@ -420,6 +421,53 @@ export async function closePaperTrade(
       closedAt: new Date().toISOString(),
     })
     .where(eq(paperTrades.id, tradeId));
+
+  // ─── Auto-reopen dopo TP (scia vincente) ───────────────────────────────
+  const closeReason = reason || "unknown";
+  if (closeReason === "take_profit") {
+    try {
+      const strat = await db
+        .select()
+        .from(strategies)
+        .where(eq(strategies.id, t.strategyId))
+        .limit(1);
+      if (strat.length > 0 && strat[0].status === "paper_active") {
+        // Crea un nuovo decision journal entry per l'auto-reopen
+        const dj = await db.insert(decisionJournal).values({
+          strategyId: t.strategyId,
+          decision: "paper_copy",
+          confidenceScore: 0.8,
+          reasonsJson: JSON.stringify(["Auto-reopen dopo TP — scia vincente"]),
+          risksJson: JSON.stringify(["Rischio di inversione dopo TP"]),
+          simulatedPositionSize: t.simulatedPositionSize,
+        });
+
+        const newTradeId = await openPaperTrade(
+          Number(dj.lastInsertRowid),
+          t.strategyId,
+          t.asset,
+          t.side as "long" | "short",
+          exitPrice,
+          t.simulatedPositionSize,
+        );
+
+        console.log(`  ♻️ Trade #${newTradeId} auto-riaperto ${t.asset} ${t.side} @ ${exitPrice} (scia vincente dopo TP #${tradeId})`);
+
+        // Notifica Telegram
+        const icon = t.side === "long" ? "📈" : "📉";
+        await sendTelegram(
+          `♻️ <b>Auto-Reopen — Scia Vincente</b>\n` +
+          `Trade #${newTradeId} · ${t.asset} ${t.side.toUpperCase()}\n` +
+          `Entry: $${exitPrice.toFixed(2)}\n` +
+          `Size: $${t.simulatedPositionSize.toFixed(2)}\n` +
+          `Strategia: ${strat[0].name}\n` +
+          `(riaperto dopo TP del #${tradeId})`
+        );
+      }
+    } catch (err) {
+      console.error(`[Auto-reopen after TP] Errore:`, err);
+    }
+  }
 }
 
 export async function updateAllOpenPnL(): Promise<{ total: number; count: number; closed: number }> {
