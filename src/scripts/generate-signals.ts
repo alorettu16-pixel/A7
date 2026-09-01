@@ -79,6 +79,22 @@ async function main() {
   let totalSignals = 0;
   let closedCount = 0;
 
+  // ─── Cooldown: asset recentemente in perdita rapida (entro 6 ore) ────────
+  const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+  const recentLossesRaw = db.$client
+    .prepare(`SELECT asset, opened_at, realized_pnl FROM paper_trades WHERE status = 'closed' AND closed_at >= datetime('now', '-6 hours') AND realized_pnl < -5`)
+    .all() as { asset: string; opened_at: string; realized_pnl: number }[];
+  const cooldownAssets = new Set<string>();
+  for (const rl of recentLossesRaw) {
+    const openedMs = new Date(rl.opened_at).getTime();
+    if (Date.now() - openedMs < SIX_HOURS_MS) {
+      cooldownAssets.add(rl.asset);
+    }
+  }
+  if (cooldownAssets.size > 0) {
+    log("WARN", `⏳ Cooldown attivo per: ${Array.from(cooldownAssets).join(', ')} (perdita rapida <6h fa)`);
+  }
+
   // ─── Reverse Signal + Generazione ────────────────────────────────────────
   // MACD LONG+SHORT ottimizzate per 4h
   const TF = "4h";
@@ -132,6 +148,11 @@ async function main() {
 
     // ─── Nuovi segnali ────────────────────────────────────────────────────────
     for (const s of activeStrategies) {
+      // Skippa se l'asset è in cooldown (perdita rapida <6h fa)
+      if (cooldownAssets.has(asset)) {
+        console.log(`   ⏳ ${asset}: cooldown attivo (perdita rapida <6h fa) — skip ${s.name}`);
+        continue;
+      }
       const alreadyOpen = assetOpen.has(s.id);
       const rules: StrategyRules = {
         entry: JSON.parse(s.entryRulesJson),
