@@ -7,6 +7,10 @@ import { openPaperTrade, closePaperTrade } from "@/paper-trading/engine";
 import { log, logSignal, logClose, logError, logBlock } from "@/lib/logger";
 import { sendTelegram, formatTradeOpen, formatTradeClose, formatAlert, formatError } from "@/lib/telegram";
 
+// Cooldown notifiche esposizione massima (evita spam ogni 3 min)
+let lastExposureBlockNotif = 0;
+const EXPOSURE_BLOCK_COOLDOWN = 30 * 60 * 1000;
+
 // Asset monitorati — più ampia copertura per più segnali
 const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
 
@@ -58,9 +62,15 @@ async function main() {
 
   if (totalExposure >= budgetBasedMaxExposure) {
     console.log(`🛑 Esposizione totale ${totalExposure.toFixed(2)}$ >= budget ${budgetBasedMaxExposure.toFixed(2)}$ — blocco.`);
-    await sendTelegram(formatAlert("Esposizione Massima Raggiunta",
-      `Esposizione ${totalExposure.toFixed(2)}$ ≥ ${budgetBasedMaxExposure.toFixed(2)}$ — nessun nuovo trade.\nRiprovare al prossimo ciclo.`
-    ));
+    const now = Date.now();
+    const cooldownOk = now - lastExposureBlockNotif > EXPOSURE_BLOCK_COOLDOWN;
+    if (cooldownOk) {
+      lastExposureBlockNotif = now;
+      await sendTelegram(formatAlert("Esposizione Massima Raggiunta",
+        `Esposizione ${totalExposure.toFixed(2)}$ ≥ ${budgetBasedMaxExposure.toFixed(2)}$ — nessun nuovo trade.
+Riprovare al prossimo ciclo.`
+      ));
+    }
     process.exit(0);
   }
 
