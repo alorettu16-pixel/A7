@@ -62,15 +62,6 @@ async function main() {
 
   if (totalExposure >= budgetBasedMaxExposure) {
     console.log(`🛑 Esposizione totale ${totalExposure.toFixed(2)}$ >= budget ${budgetBasedMaxExposure.toFixed(2)}$ — blocco.`);
-    const now = Date.now();
-    const cooldownOk = now - lastExposureBlockNotif > EXPOSURE_BLOCK_COOLDOWN;
-    if (cooldownOk) {
-      lastExposureBlockNotif = now;
-      await sendTelegram(formatAlert("Esposizione Massima Raggiunta",
-        `Esposizione ${totalExposure.toFixed(2)}$ ≥ ${budgetBasedMaxExposure.toFixed(2)}$ — nessun nuovo trade.
-Riprovare al prossimo ciclo.`
-      ));
-    }
     process.exit(0);
   }
 
