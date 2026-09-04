@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { RefreshCw, TrendingUp, TrendingDown, Activity, Timer, XCircle } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, Activity, Timer, XCircle, Filter, ArrowDown, ArrowUp, Calendar } from "lucide-react";
 
 interface TradeData {
   id: number; strategyId: number; asset: string; side: string;
@@ -13,29 +13,23 @@ interface TradeData {
   timeExitHours?: number;
 }
 
-// ─── Countdown Timer ────────────────────────────────────────────────────────
+const ALL_ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
+
 function CountdownTimer({ endMs, maxHours }: { endMs: number; maxHours: number }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
   }, []);
-
   const remaining = Math.max(0, endMs - now);
   const total = maxHours * 60 * 60 * 1000;
   const elapsed = total - remaining;
   const pct = Math.min(100, (elapsed / total) * 100);
-
-  if (remaining <= 0) {
-    return <span className="text-red-400 font-medium text-xs">SCADUTA</span>;
-  }
-
+  if (remaining <= 0) return <span className="text-red-400 font-medium text-xs">SCADUTA</span>;
   const h = Math.floor(remaining / (1000 * 60 * 60));
   const m = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
   const s = Math.floor((remaining % (1000 * 60)) / 1000);
-
   const color = h < 12 ? "text-red-400" : h < 24 ? "text-yellow-400" : "text-[#94a3b8]";
-
   return (
     <div className="flex items-center gap-1.5">
       <Timer size={10} className={color} />
@@ -52,10 +46,30 @@ function CountdownTimer({ endMs, maxHours }: { endMs: number; maxHours: number }
 export default function PaperTradesPage() {
   const [trades, setTrades] = useState<TradeData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterAsset, setFilterAsset] = useState("");
+  const [filterSide, setFilterSide] = useState("");
+  const [sortBy, setSortBy] = useState("pnl");
+  const [sortDir, setSortDir] = useState("desc");
+
+  const toggleSortDir = () => setSortDir(d => d === "desc" ? "asc" : "desc");
+
+  const buildUrl = () => {
+    const params = new URLSearchParams();
+    params.set("sort", sortBy);
+    params.set("dir", sortDir);
+    if (filterStatus !== "all") params.set("status", filterStatus);
+    if (filterDate) params.set("date", filterDate);
+    if (filterAsset) params.set("asset", filterAsset);
+    if (filterSide) params.set("side", filterSide);
+    return `/api/trades?${params.toString()}`;
+  };
 
   const fetchTrades = async () => {
     try {
-      const res = await fetch("/api/trades");
+      setLoading(true);
+      const res = await fetch(buildUrl());
       setTrades(await res.json());
     } catch {}
     setLoading(false);
@@ -63,11 +77,11 @@ export default function PaperTradesPage() {
 
   useEffect(() => {
     fetchTrades();
-    const iv = setInterval(fetchTrades, 15000);
+    const iv = setInterval(fetchTrades, 30000);
     return () => clearInterval(iv);
-  }, []);
+  }, [filterStatus, filterDate, filterAsset, filterSide, sortBy, sortDir]);
 
-  if (loading) return <div className="flex justify-center pt-20"><RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" /></div>;
+  if (loading && trades.length === 0) return <div className="flex justify-center pt-20"><RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" /></div>;
 
   const openTrades = trades.filter(t => t.status === "open");
   const closedTrades = trades.filter(t => t.status === "closed");
@@ -77,12 +91,12 @@ export default function PaperTradesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Paper Trades</h1>
-        <p className="text-[#94a3b8] text-sm mt-1">{trades.length} totali · {openTrades.length} aperti · PnL {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}$</p>
+        <p className="text-[#94a3b8] text-sm mt-1">{trades.length} mostrati &middot; {openTrades.length} aperti &middot; PnL {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}$</p>
       </div>
 
-      {openTrades.length > 0 && (
+      {filterStatus !== "closed" && openTrades.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-white mb-3">Posizioni Aperte</h2>
+          <h2 className="text-lg font-semibold text-white mb-3">Posizioni Aperte ({openTrades.length})</h2>
           <div className="grid gap-3">
             {openTrades.map(t => {
               const pnl = (t.unrealizedPnl || 0);
@@ -116,12 +130,11 @@ export default function PaperTradesPage() {
                       />
                     </div>
                   </div>
-                  {/* SL/TP Progress Bars */}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div>
                       <div className="flex items-center justify-between text-[10px] mb-0.5">
                         <span className="text-red-400">SL {slPct}%</span>
-                        <span className="text-[#64748b]">{distToSL > 0 ? distToSL.toFixed(2) + "%" : "⛔"}</span>
+                        <span className="text-[#64748b]">{distToSL > 0 ? distToSL.toFixed(2) + "%" : "\u26D4"}</span>
                       </div>
                       <div className="w-full h-1.5 bg-[#1e1e3a] rounded-full overflow-hidden">
                         <div className="h-full rounded-full bg-red-500/60 transition-all duration-1000" style={{ width: `${toSLbar}%` }} />
@@ -130,14 +143,14 @@ export default function PaperTradesPage() {
                     <div>
                       <div className="flex items-center justify-between text-[10px] mb-0.5">
                         <span className="text-green-400">TP {tpPct}%</span>
-                        <span className="text-[#64748b]">{distToTP > 0 ? distToTP.toFixed(2) + "%" : "✅"}</span>
+                        <span className="text-[#64748b]">{distToTP > 0 ? distToTP.toFixed(2) + "%" : "\u2705"}</span>
                       </div>
                       <div className="w-full h-1.5 bg-[#1e1e3a] rounded-full overflow-hidden">
                         <div className="h-full rounded-full bg-green-500/60 transition-all duration-1000" style={{ width: `${toTPbar}%` }} />
                       </div>
                     </div>
                   </div>
-                  <div className="text-xs text-[#64748b] mt-2">Aperto: {new Date(t.openedAt).toLocaleString()} · {t.strategyName}</div>
+                  <div className="text-xs text-[#64748b] mt-2">Aperto: {new Date(t.openedAt).toLocaleString()} {t.strategyName}</div>
                   <button
                     onClick={async () => {
                       if (!confirm("Chiudere manualmente il trade #" + t.id + "?")) return;
@@ -158,28 +171,40 @@ export default function PaperTradesPage() {
         </div>
       )}
 
-      {closedTrades.length > 0 && (
+      {filterStatus !== "open" && closedTrades.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-white mb-3">Trade Conclusi ({closedTrades.length})</h2>
+          <h2 className="text-lg font-semibold text-white mb-3">
+            Trade Conclusi ({closedTrades.length})
+            {filterDate && <span className="text-[#64748b] text-sm font-normal ml-2"> {filterDate}</span>}
+          </h2>
           <div className="space-y-2">
-            {closedTrades.map(t => (
-              <div key={t.id} className="glass-card p-3 text-sm animate-slide-in">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Activity size={14} className="text-gray-400" />
-                    <span className="text-white">{t.asset}</span>
-                    <span className={t.side === "long" ? "text-green-400" : "text-red-400"}>{t.side.toUpperCase()}</span>
-                    <span className="text-[#94a3b8]">#{t.id}</span>
+            {closedTrades.map(t => {
+              const pnl = t.realizedPnl || 0;
+              const pnlPct = t.entryPrice > 0 ? (t.side === "long" ? (t.currentPrice - t.entryPrice) / t.entryPrice * 100 : (t.entryPrice - t.currentPrice) / t.entryPrice * 100) : 0;
+              const emoji = pnl > 5 ? "\uD83D\uDFE2" : pnl > 0 ? "\u2705" : pnl === 0 ? "\u26AA" : pnl > -5 ? "\uD83D\uDD34" : "\uD83D\uDC80";
+              return (
+                <div key={t.id} className="glass-card p-3 text-sm animate-slide-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Activity size={14} className="text-gray-400" />
+                      <span className="text-white">{t.asset}</span>
+                      <span className={t.side === "long" ? "text-green-400" : "text-red-400"}>{t.side.toUpperCase()}</span>
+                      <span className="text-[#94a3b8]">#{t.id}</span>
+                    </div>
+                    <span className={`font-medium ${pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {emoji} {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}$ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+                    </span>
                   </div>
-                  <span className={(t.realizedPnl || 0) >= 0 ? "text-green-400" : "text-red-400"}>
-                    {(t.realizedPnl || 0) >= 0 ? "+" : ""}{(t.realizedPnl || 0).toFixed(2)}$
-                  </span>
+                  <div className="text-xs text-[#64748b] mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+                    <span>Entry ${t.entryPrice.toFixed(2)}</span>
+                    <span>Exit ${t.currentPrice.toFixed(2)}</span>
+                    <span>Size ${t.simulatedPositionSize.toFixed(2)}</span>
+                    <span>{t.strategyName}</span>
+                    <span>{new Date(t.openedAt).toLocaleDateString()} {t.closedAt ? new Date(t.closedAt).toLocaleDateString() : ""}</span>
+                  </div>
                 </div>
-                <div className="text-xs text-[#64748b] mt-1">
-                  Entry ${t.entryPrice.toFixed(2)} · Exit ${t.currentPrice.toFixed(2)} · {t.strategyName} · {new Date(t.openedAt).toLocaleDateString()} → {t.closedAt ? new Date(t.closedAt).toLocaleDateString() : "—"}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -194,3 +219,5 @@ export default function PaperTradesPage() {
     </div>
   );
 }
+
+      
