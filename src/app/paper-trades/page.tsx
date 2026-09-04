@@ -94,6 +94,53 @@ export default function PaperTradesPage() {
         <p className="text-[#94a3b8] text-sm mt-1">{trades.length} mostrati &middot; {openTrades.length} aperti &middot; PnL {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}$</p>
       </div>
 
+      <div className="glass-card p-3 mb-4 flex flex-wrap items-center gap-3 text-sm">
+        <Filter size={14} className="text-indigo-400" />
+        <span className="text-[#64748b] text-xs">Filtri:</span>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="bg-[#1a1a3e] text-white border border-[#2a2a5e] rounded px-2 py-1 text-xs">
+          <option value="all">Tutti</option>
+          <option value="open">Aperti</option>
+          <option value="closed">Chiusi</option>
+        </select>
+        <div className="flex items-center gap-1">
+          <Calendar size={12} className="text-[#64748b]" />
+          <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
+            className="bg-[#1a1a3e] text-white border border-[#2a2a5e] rounded px-2 py-1 text-xs w-32" />
+          {filterDate && (
+            <button onClick={() => setFilterDate("")} className="text-[#64748b] hover:text-white text-xs px-1">&times;</button>
+          )}
+        </div>
+        <select value={filterAsset} onChange={e => setFilterAsset(e.target.value)}
+          className="bg-[#1a1a3e] text-white border border-[#2a2a5e] rounded px-2 py-1 text-xs">
+          <option value="">Tutti asset</option>
+          {ALL_ASSETS.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select value={filterSide} onChange={e => setFilterSide(e.target.value)}
+          className="bg-[#1a1a3e] text-white border border-[#2a2a5e] rounded px-2 py-1 text-xs">
+          <option value="">Tutte direzioni</option>
+          <option value="long">Long</option>
+          <option value="short">Short</option>
+        </select>
+        <span className="text-[#64748b] text-xs ml-2">Ordina:</span>
+        <div className="flex items-center gap-1">
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+            className="bg-[#1a1a3e] text-white border border-[#2a2a5e] rounded px-2 py-1 text-xs">
+            <option value="pnl">PnL</option>
+            <option value="date">Data</option>
+            <option value="asset">Asset</option>
+          </select>
+          <button onClick={toggleSortDir}
+            className="bg-[#1a1a3e] text-white border border-[#2a2a5e] rounded px-2 py-1 hover:bg-[#2a2a5e] transition-colors">
+            {sortDir === "desc" ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+          </button>
+        </div>
+        <button onClick={fetchTrades}
+          className="ml-auto flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+          <RefreshCw size={12} /> Aggiorna
+        </button>
+      </div>
+
       {filterStatus !== "closed" && openTrades.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-white mb-3">Posizioni Aperte ({openTrades.length})</h2>
