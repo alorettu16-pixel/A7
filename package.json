@@ -24,6 +24,7 @@
     "webhook:test": "tsx src/scripts/test-webhook.ts",
     "test": "tsx src/scripts/run-tests.ts",
     "perf": "tsx src/scripts/perf-report.ts",
+    "trades:list": "tsx src/scripts/trades-list.ts",
     "status": "tsx src/scripts/status-check.ts",
     "go": "npm run status && npm run signals:generate && npm run paper:update-pnl && npm run review:outcomes && npm run status",
     "watch": "npm run go"
