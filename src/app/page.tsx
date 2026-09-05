@@ -7,6 +7,9 @@ import {
   FileText, Shield, ArrowUpRight, ArrowDownRight, Wallet,
   Zap, Target, Timer, AlertTriangle
 } from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid,
+} from "recharts";
 
 // ─── Countdown Timer ────────────────────────────────────────────────────────
 function CountdownTimer({ endMs, maxHours }: { endMs: number; maxHours: number }) {
@@ -117,6 +120,90 @@ function CandleChart() {
   );
 }
 
+// ─── Grafico Budget/Equity Line ────────────────────────────────────────────
+function BudgetLineChart({ data, budgetDemo }: { data: { time: string; equity: number }[]; budgetDemo: number }) {
+  if (!data || data.length === 0) return null;
+
+  // Formatta i dati per Recharts — ogni equity point + baseline budgetDemo
+  const chartData = data.map((d, i) => ({
+    label: i === 0 || i === data.length - 1 || i % Math.max(1, Math.floor(data.length / 8)) === 0
+      ? new Date(d.time).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })
+      : "",
+    equity: budgetDemo + d.equity,
+    rawPnl: d.equity,
+  }));
+
+  const minVal = Math.min(...chartData.map(d => d.equity));
+  const maxVal = Math.max(...chartData.map(d => d.equity));
+  const yDomainMin = Math.max(0, minVal - (maxVal - minVal) * 0.15);
+  const yDomainMax = maxVal + (maxVal - minVal) * 0.15;
+
+  const latestEquity = chartData[chartData.length - 1]?.equity ?? budgetDemo;
+  const isPositive = latestEquity >= budgetDemo;
+
+  // Tooltip personalizzato
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const d = payload[0].payload as typeof chartData[0];
+    return (
+      <div className="bg-[#1a1a3e] border border-[#2a2a5a] rounded-lg px-3 py-2 text-xs shadow-xl">
+        <div className="text-[#94a3b8] mb-1">{label || "—"}</div>
+        <div className="text-white font-semibold">${d.equity.toFixed(2)}</div>
+        <div className={d.rawPnl >= 0 ? "text-green-400" : "text-red-400"}>
+          {d.rawPnl >= 0 ? "+" : ""}{d.rawPnl.toFixed(2)}$ PnL totale
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <defs>
+            <linearGradient id="budgetGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e1e3a" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: "#64748b", fontSize: 10 }}
+            axisLine={{ stroke: "#1e1e3a" }}
+            tickLine={false}
+            interval={0}
+          />
+          <YAxis
+            domain={[yDomainMin, yDomainMax]}
+            tick={{ fill: "#64748b", fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => `$${v.toFixed(0)}`}
+            width={60}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Area
+            type="monotone"
+            dataKey="equity"
+            stroke={isPositive ? "#22c55e" : "#ef4444"}
+            strokeWidth={2}
+            fill="url(#budgetGradient)"
+            dot={false}
+            activeDot={{ r: 4, fill: isPositive ? "#22c55e" : "#ef4444", strokeWidth: 0 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="flex items-center justify-between mt-2 text-xs text-[#64748b]">
+        <span>Baseline: ${budgetDemo.toFixed(2)}</span>
+        <span className={isPositive ? "text-green-400" : "text-red-400"}>
+          {isPositive ? "📈 " : "📉 "}PnL totale: {isPositive ? "+" : ""}{(latestEquity - budgetDemo).toFixed(2)}$
+        </span>
+      </div>
+    </div>
+  );
+}
+
 type StepId = "seed" | "backtest" | "signals" | "pnl" | "report" | "webhook";
 
 interface Step {
@@ -142,6 +229,9 @@ interface OverviewData {
   realizedPnl: number;
   unrealizedPnl: number;
   totalBudget: number;
+  prevDayTotalBudget: number | null;
+  dayChangePct: number | null;
+  dayChangeValue: number | null;
   activeStrategies: number;
   openPositions: number;
   signalsToday: number;
@@ -297,6 +387,7 @@ export default function HomePage() {
   // --- MAIN DASHBOARD ---
   const o = overview || {
     totalPnl: 0, realizedPnl: 0, unrealizedPnl: 0, totalBudget: 500,
+    prevDayTotalBudget: null, dayChangePct: null, dayChangeValue: null,
     activeStrategies: 0, openPositions: 0, signalsToday: 0,
     webhooksToday: 0, liveTradingEnabled: false, budgetDemo: 500,
     avgDeviation: 0, equityCurve: [],
@@ -448,6 +539,48 @@ export default function HomePage() {
           </div>
           <div className="text-xs text-[#64748b] mt-1">Paper trading attivo</div>
         </div>
+      </div>
+
+      {/* ─── GRAFICO BUDGET TOTALE ────────────────────────────────────── */}
+
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-white font-semibold flex items-center gap-2">
+            <Wallet size={18} className="text-indigo-400" />
+            Budget Totale
+          </h2>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="text-right">
+              <div className="text-xs text-[#64748b]">Budget</div>
+              <div className="text-white font-bold text-lg">${o.totalBudget.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+            {o.dayChangeValue !== null && o.dayChangePct !== null && (
+              <>
+                <div className="text-right">
+                  <div className="text-xs text-[#64748b]">Variazione 24h</div>
+                  <div className={`font-bold text-lg flex items-center gap-1 ${o.dayChangeValue >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {o.dayChangeValue >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                    {o.dayChangeValue >= 0 ? "+" : ""}{o.dayChangeValue.toFixed(2)}$
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-[#64748b]">% su ieri</div>
+                  <div className={`font-bold text-lg ${o.dayChangePct >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {o.dayChangePct >= 0 ? "+" : ""}{o.dayChangePct.toFixed(2)}%
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        {o.equityCurve && o.equityCurve.length > 1 ? (
+          <BudgetLineChart data={o.equityCurve} budgetDemo={o.budgetDemo} />
+        ) : (
+          <div className="text-center py-6 text-[#64748b] text-sm">
+            <BarChart3 size={24} className="mx-auto mb-2 opacity-30" />
+            Dati equity non ancora disponibili — saranno generati al prossimo report giornaliero.
+          </div>
+        )}
       </div>
 
       {/* ─── GRAFICI A CANDELE — 10 asset ───────────────────────────────── */}

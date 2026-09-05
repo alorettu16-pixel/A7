@@ -1,4 +1,4 @@
-import db, { strategies, paperTrades, decisionJournal, tradingViewWebhookLogs, riskLimits, equitySnapshots } from "@/db";
+import db, { strategies, paperTrades, decisionJournal, tradingViewWebhookLogs, riskLimits, equitySnapshots, dailyReports } from "@/db";
 import { eq, desc, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -40,12 +40,59 @@ export async function GET() {
     .orderBy(desc(equitySnapshots.snapshotAt))
     .limit(50);
 
+  // ─── PnL chiusura giorno precedente (dal report giornaliero) ───────────
+  const todayStr = new Date().toISOString().split("T")[0];
+  const prevDayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  let prevDayClosePnl = null;
+  try {
+    const prevReport = await db
+      .select()
+      .from(dailyReports)
+      .where(eq(dailyReports.date, prevDayStr))
+      .limit(1);
+    if (prevReport.length > 0 && prevReport[0].paperPnl !== null) {
+      prevDayClosePnl = prevReport[0].paperPnl;
+    } else {
+      // Fallback: primo equitySnapshot prima di oggi
+      try {
+        const prevSnap = await db
+          .select()
+          .from(equitySnapshots)
+          .where(gte(equitySnapshots.snapshotAt, prevDayStr + " 00:00:00"))
+          .orderBy(desc(equitySnapshots.snapshotAt))
+          .limit(1);
+        // Filtra per data di fine giorno manualmente
+        const prevSnapFiltered = prevSnap.filter(s => s.snapshotAt && s.snapshotAt <= prevDayStr + " 23:59:59");
+        if (prevSnapFiltered.length > 0) prevDayClosePnl = prevSnapFiltered[0].totalPnl;
+      } catch {
+        // silenzioso
+      }
+    }
+  } catch {
+    // silenzioso
+  }
+
+  // Totale budget corrente = budget demo + PnL realizzato
+  const totalBudget = budgetDemo + realizedPnl;
+  const prevDayTotalBudget = prevDayClosePnl !== null ? budgetDemo + prevDayClosePnl : null;
+
+  // Variazione % e $ rispetto al giorno prima
+  let dayChangePct = null;
+  let dayChangeValue = null;
+  if (prevDayTotalBudget !== null && prevDayTotalBudget !== 0) {
+    dayChangePct = ((totalBudget - prevDayTotalBudget) / prevDayTotalBudget) * 100;
+    dayChangeValue = totalBudget - prevDayTotalBudget;
+  }
+
   return NextResponse.json({
     hasStrategies,
     totalPnl: Math.round(totalPnl * 100) / 100,
     realizedPnl: Math.round(realizedPnl * 100) / 100,
     unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
-    totalBudget: Math.round((budgetDemo + realizedPnl) * 100) / 100,
+    totalBudget: Math.round(totalBudget * 100) / 100,
+    prevDayTotalBudget: prevDayTotalBudget !== null ? Math.round(prevDayTotalBudget * 100) / 100 : null,
+    dayChangePct: dayChangePct !== null ? Math.round(dayChangePct * 100) / 100 : null,
+    dayChangeValue: dayChangeValue !== null ? Math.round(dayChangeValue * 100) / 100 : null,
     activeStrategies: active.length,
     openPositions,
     totalExposure: Math.round(totalExposure * 100) / 100,
