@@ -1,8 +1,13 @@
 import db, { strategies, paperTrades, decisionJournal, tradingViewWebhookLogs, riskLimits, equitySnapshots, dailyReports } from "@/db";
-import { eq, desc, gte } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { eq, desc, gte, lte } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const range = searchParams.get("range") || "all"; // 1d, 7d, 30d, 365d, all
+  const fromDate = searchParams.get("from"); // ISO date
+  const toDate = searchParams.get("to"); // ISO date
+
   const allTrades = await db.select().from(paperTrades);
   let totalPnl = 0, realizedPnl = 0, unrealizedPnl = 0;
   for (const t of allTrades) {
@@ -30,69 +35,93 @@ export async function GET() {
   const liveTradingEnabled = limits.length > 0 ? limits[0].liveTradingEnabled : false;
   const budgetDemo = limits.length > 0 ? limits[0].demoBudgetUsd : 10000;
 
-  // Esposizione totale (somma size posizioni aperte)
   const openTradeList = allTrades.filter(t => t.status === "open");
   const totalExposure = openTradeList.reduce((sum, t) => sum + (t.simulatedPositionSize || 0), 0);
 
-  const snapshots = await db
+  // ─── Equity Snapshots filtrati per range/date ────────────────────────
+  let sinceDate: string | null = null;
+  const now = new Date();
+
+  if (fromDate) {
+    sinceDate = fromDate + " 00:00:00";
+  } else if (range !== "all") {
+    const days = parseInt(range.replace("d", ""));
+    sinceDate = new Date(now.getTime() - days * 86400000).toISOString().split("T")[0] + " 00:00:00";
+  }
+
+  let snapshots;
+  if (sinceDate && toDate) {
+    snapshots = await db
+      .select()
+      .from(equitySnapshots)
+      .where(gte(equitySnapshots.snapshotAt, sinceDate))
+      .orderBy(desc(equitySnapshots.snapshotAt))
+      .limit(200);
+    snapshots = snapshots.filter(s => s.snapshotAt && s.snapshotAt <= toDate + " 23:59:59");
+  } else if (sinceDate) {
+    snapshots = await db
+      .select()
+      .from(equitySnapshots)
+      .where(gte(equitySnapshots.snapshotAt, sinceDate))
+      .orderBy(desc(equitySnapshots.snapshotAt))
+      .limit(200);
+  } else {
+    snapshots = await db
+      .select()
+      .from(equitySnapshots)
+      .orderBy(desc(equitySnapshots.snapshotAt))
+      .limit(200);
+  }
+
+  // ─── Variazioni per periodo ────────────────────────────────────────
+  // Calcola le variazioni su tutti gli snapshot disponibili
+  const allSnapshots = await db
     .select()
     .from(equitySnapshots)
     .orderBy(desc(equitySnapshots.snapshotAt))
-    .limit(50);
+    .limit(400);
 
-  // ─── PnL chiusura giorno precedente (dal report giornaliero) ───────────
-  const todayStr = new Date().toISOString().split("T")[0];
-  const prevDayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-  let prevDayClosePnl = null;
-  try {
-    const prevReport = await db
-      .select()
-      .from(dailyReports)
-      .where(eq(dailyReports.date, prevDayStr))
-      .limit(1);
-    if (prevReport.length > 0 && prevReport[0].paperPnl !== null) {
-      prevDayClosePnl = prevReport[0].paperPnl;
-    } else {
-      // Fallback: primo equitySnapshot prima di oggi
-      try {
-        const prevSnap = await db
-          .select()
-          .from(equitySnapshots)
-          .where(gte(equitySnapshots.snapshotAt, prevDayStr + " 00:00:00"))
-          .orderBy(desc(equitySnapshots.snapshotAt))
-          .limit(1);
-        // Filtra per data di fine giorno manualmente
-        const prevSnapFiltered = prevSnap.filter(s => s.snapshotAt && s.snapshotAt <= prevDayStr + " 23:59:59");
-        if (prevSnapFiltered.length > 0) prevDayClosePnl = prevSnapFiltered[0].totalPnl;
-      } catch {
-        // silenzioso
-      }
+  function getSnapshotAtOffset(daysAgo: number): number | null {
+    const target = new Date(now.getTime() - daysAgo * 86400000).toISOString().split("T")[0];
+    for (const s of allSnapshots) {
+      if (s.snapshotAt && s.snapshotAt.startsWith(target)) return s.totalPnl;
     }
-  } catch {
-    // silenzioso
+    return null;
   }
 
-  // Totale budget corrente = budget demo + PnL realizzato
-  const totalBudget = budgetDemo + realizedPnl;
-  const prevDayTotalBudget = prevDayClosePnl !== null ? budgetDemo + prevDayClosePnl : null;
+  const currentTotal = budgetDemo + realizedPnl;
+  const prevDayTotal = getSnapshotAtOffset(1);
+  const prevWeekTotal = getSnapshotAtOffset(7);
+  const prevMonthTotal = getSnapshotAtOffset(30);
+  const prevYearTotal = getSnapshotAtOffset(365);
 
-  // Variazione % e $ rispetto al giorno prima
-  let dayChangePct = null;
-  let dayChangeValue = null;
-  if (prevDayTotalBudget !== null && prevDayTotalBudget !== 0) {
-    dayChangePct = ((totalBudget - prevDayTotalBudget) / prevDayTotalBudget) * 100;
-    dayChangeValue = totalBudget - prevDayTotalBudget;
+  function calcChange(basePnl: number | null): { value: number | null; pct: number | null } {
+    if (basePnl === null) return { value: null, pct: null };
+    const prevBudget = budgetDemo + basePnl;
+    if (prevBudget === 0) return { value: null, pct: null };
+    return {
+      value: Math.round((currentTotal - prevBudget) * 100) / 100,
+      pct: Math.round(((currentTotal - prevBudget) / prevBudget) * 10000) / 100,
+    };
   }
+
+  const dayChange = calcChange(prevDayTotal);
+  const weekChange = calcChange(prevWeekTotal);
+  const monthChange = calcChange(prevMonthTotal);
+  const yearChange = calcChange(prevYearTotal);
 
   return NextResponse.json({
     hasStrategies,
     totalPnl: Math.round(totalPnl * 100) / 100,
     realizedPnl: Math.round(realizedPnl * 100) / 100,
     unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
-    totalBudget: Math.round(totalBudget * 100) / 100,
-    prevDayTotalBudget: prevDayTotalBudget !== null ? Math.round(prevDayTotalBudget * 100) / 100 : null,
-    dayChangePct: dayChangePct !== null ? Math.round(dayChangePct * 100) / 100 : null,
-    dayChangeValue: dayChangeValue !== null ? Math.round(dayChangeValue * 100) / 100 : null,
+    totalBudget: Math.round(currentTotal * 100) / 100,
+    changes: {
+      day: dayChange,
+      week: weekChange,
+      month: monthChange,
+      year: yearChange,
+    },
     activeStrategies: active.length,
     openPositions,
     totalExposure: Math.round(totalExposure * 100) / 100,

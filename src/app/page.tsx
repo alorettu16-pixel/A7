@@ -11,6 +11,10 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid,
 } from "recharts";
 
+// ─── Tipi per variazioni per periodo ───────────────────────────────────────
+interface ChangeInfo { value: number | null; pct: number | null; }
+interface PeriodChanges { day: ChangeInfo; week: ChangeInfo; month: ChangeInfo; year: ChangeInfo; }
+
 // ─── Countdown Timer ────────────────────────────────────────────────────────
 function CountdownTimer({ endMs, maxHours }: { endMs: number; maxHours: number }) {
   const [now, setNow] = useState(Date.now());
@@ -120,84 +124,124 @@ function CandleChart() {
   );
 }
 
-// ─── Grafico Budget/Equity Line ────────────────────────────────────────────
-function BudgetLineChart({ data, budgetDemo }: { data: { time: string; equity: number }[]; budgetDemo: number }) {
-  if (!data || data.length === 0) return null;
+// ─── Grafico Budget con filtri ──────────────────────────────────────────────
+const RANGE_PRESETS = [
+  { key: "1d", label: "24h" }, { key: "7d", label: "7g" },
+  { key: "30d", label: "30g" }, { key: "365d", label: "365g" }, { key: "all", label: "Tutto" },
+] as const;
 
-  // Formatta i dati per Recharts — ogni equity point + baseline budgetDemo
-  const chartData = data.map((d, i) => ({
-    label: i === 0 || i === data.length - 1 || i % Math.max(1, Math.floor(data.length / 8)) === 0
-      ? new Date(d.time).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })
-      : "",
-    equity: budgetDemo + d.equity,
-    rawPnl: d.equity,
-  }));
+function BudgetLineChart({ data, budgetDemo, activeRange, changes, onRangeChange, onDateChange }: {
+  data: { time: string; equity: number }[]; budgetDemo: number; activeRange: string;
+  changes?: PeriodChanges; onRangeChange: (r: string) => void; onDateChange: (f: string, t: string) => void;
+}) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [fromInput, setFromInput] = useState("");
+  const [toInput, setToInput] = useState("");
 
-  const minVal = Math.min(...chartData.map(d => d.equity));
-  const maxVal = Math.max(...chartData.map(d => d.equity));
-  const yDomainMin = Math.max(0, minVal - (maxVal - minVal) * 0.15);
-  const yDomainMax = maxVal + (maxVal - minVal) * 0.15;
+  if (!data?.length) return null;
 
-  const latestEquity = chartData[chartData.length - 1]?.equity ?? budgetDemo;
+  const chartData = data.map((d, i) => {
+    const dt = new Date(d.time);
+    return {
+      label: i===0||i===data.length-1||i%Math.max(1,Math.floor(data.length/10))===0
+        ? dt.toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"}) : "",
+      equity: budgetDemo + d.equity, rawPnl: d.equity,
+    };
+  });
+
+  const vals = chartData.map(d=>d.equity);
+  const yMin = Math.max(0, Math.min(...vals) - (Math.max(...vals)-Math.min(...vals))*0.12);
+  const yMax = Math.max(...vals) + (Math.max(...vals)-Math.min(...vals))*0.12;
+  const latestEquity = chartData[chartData.length-1]?.equity ?? budgetDemo;
   const isPositive = latestEquity >= budgetDemo;
 
-  // Tooltip personalizzato
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload || payload.length === 0) return null;
-    const d = payload[0].payload as typeof chartData[0];
-    return (
-      <div className="bg-[#1a1a3e] border border-[#2a2a5a] rounded-lg px-3 py-2 text-xs shadow-xl">
-        <div className="text-[#94a3b8] mb-1">{label || "—"}</div>
-        <div className="text-white font-semibold">${d.equity.toFixed(2)}</div>
-        <div className={d.rawPnl >= 0 ? "text-green-400" : "text-red-400"}>
-          {d.rawPnl >= 0 ? "+" : ""}{d.rawPnl.toFixed(2)}$ PnL totale
-        </div>
-      </div>
-    );
-  };
+  const activeChange: ChangeInfo | null = activeRange==="1d"?changes?.day??null
+    : activeRange==="7d"?changes?.week??null
+    : activeRange==="30d"?changes?.month??null
+    : activeRange==="365d"?changes?.year??null
+    : null;
+  const changeLabel = activeRange==="1d"?"24h":activeRange==="7d"?"7g":activeRange==="30d"?"30g":activeRange==="365d"?"365g":"";
+
+  const apply = () => { if(fromInput&&toInput){onDateChange(fromInput,toInput);setShowDatePicker(false);} };
 
   return (
     <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-1">
+          {RANGE_PRESETS.map(p=>(
+            <button key={p.key} onClick={()=>onRangeChange(p.key)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${activeRange===p.key?"bg-indigo-500/20 text-indigo-300 border border-indigo-500/40":"bg-[#1e1e3a] text-[#94a3b8] hover:text-white hover:bg-[#2a2a5a]"}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={()=>setShowDatePicker(!showDatePicker)}
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${showDatePicker?"bg-indigo-500/20 text-indigo-300 border border-indigo-500/40":"bg-[#1e1e3a] text-[#94a3b8] hover:text-white hover:bg-[#2a2a5a]"}`}>
+          Date Range
+        </button>
+      </div>
+
+      {showDatePicker && (
+        <div className="flex items-center gap-2 mb-4 p-3 bg-[#0a0a1a] rounded-lg flex-wrap">
+          <span className="text-xs text-[#64748b]">Da:</span>
+          <input type="date" value={fromInput} onChange={e=>setFromInput(e.target.value)}
+            className="bg-[#1e1e3a] text-white text-xs rounded px-2 py-1 border border-[#2a2a5a] focus:border-indigo-500 outline-none" />
+          <span className="text-xs text-[#64748b]">A:</span>
+          <input type="date" value={toInput} onChange={e=>setToInput(e.target.value)}
+            className="bg-[#1e1e3a] text-white text-xs rounded px-2 py-1 border border-[#2a2a5a] focus:border-indigo-500 outline-none" />
+          <button onClick={apply} disabled={!fromInput||!toInput}
+            className="px-3 py-1 rounded-lg text-xs font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 disabled:opacity-30 disabled:cursor-not-allowed">Applica</button>
+          <button onClick={()=>{setShowDatePicker(false);onRangeChange("all");}} className="px-2 py-1 text-xs text-[#64748b] hover:text-white">Annulla</button>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="text-[10px] text-[#64748b] uppercase">Budget</div>
+          <div className="text-white font-bold text-xl">${latestEquity.toFixed(2)}</div>
+        </div>
+        {activeChange && activeChange.value !== null && activeChange.pct !== null && (
+                  <div className="text-right">
+                    <div className="text-[10px] text-[#64748b] uppercase">Variazione {changeLabel}</div>
+                    <div className={`flex items-center gap-1.5 font-bold text-lg ${(activeChange.value as number) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {(activeChange.value as number) >= 0 ? <TrendingUp size={16}/> : <TrendingDown size={16}/>}
+                      <span>{(activeChange.value as number) >= 0 ? "+" : ""}{(activeChange.value as number).toFixed(2)}$</span>
+                      <span className="text-sm opacity-70">({(activeChange.pct as number) >= 0 ? "+" : ""}{(activeChange.pct as number).toFixed(2)}%)</span>
+                    </div>
+                  </div>
+                )}
+      </div>
+
       <ResponsiveContainer width="100%" height={200}>
-        <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <AreaChart data={chartData} margin={{top:5,right:10,left:0,bottom:5}}>
           <defs>
-            <linearGradient id="budgetGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity={0.25} />
-              <stop offset="100%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity={0.02} />
+            <linearGradient id="budgetGradient2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={isPositive?"#22c55e":"#ef4444"} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={isPositive?"#22c55e":"#ef4444"} stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e1e3a" vertical={false} />
-          <XAxis
-            dataKey="label"
-            tick={{ fill: "#64748b", fontSize: 10 }}
-            axisLine={{ stroke: "#1e1e3a" }}
-            tickLine={false}
-            interval={0}
-          />
-          <YAxis
-            domain={[yDomainMin, yDomainMax]}
-            tick={{ fill: "#64748b", fontSize: 10 }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => `$${v.toFixed(0)}`}
-            width={60}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Area
-            type="monotone"
-            dataKey="equity"
-            stroke={isPositive ? "#22c55e" : "#ef4444"}
-            strokeWidth={2}
-            fill="url(#budgetGradient)"
-            dot={false}
-            activeDot={{ r: 4, fill: isPositive ? "#22c55e" : "#ef4444", strokeWidth: 0 }}
-          />
+          <XAxis dataKey="label" tick={{fill:"#64748b",fontSize:10}} axisLine={{stroke:"#1e1e3a"}} tickLine={false} interval={0} />
+          <YAxis domain={[yMin,yMax]} tick={{fill:"#64748b",fontSize:10}} axisLine={false} tickLine={false}
+            tickFormatter={(v:number)=>`$${v.toFixed(0)}`} width={60} />
+          <Tooltip content={({active,payload,label}:any)=>{
+            if(!active||!payload?.length) return null;
+            const d = payload[0].payload;
+            return (<div className="bg-[#1a1a3e] border border-[#2a2a5a] rounded-lg px-3 py-2 text-xs shadow-xl">
+              <div className="text-[#94a3b8] mb-1">{label||"—"}</div>
+              <div className="text-white font-semibold">${d.equity.toFixed(2)}</div>
+              <div className={d.rawPnl>=0?"text-green-400":"text-red-400"}>{d.rawPnl>=0?"+":""}{d.rawPnl.toFixed(2)}$ PnL</div>
+            </div>);
+          }} />
+          <Area type="monotone" dataKey="equity" stroke={isPositive?"#22c55e":"#ef4444"} strokeWidth={2}
+            fill="url(#budgetGradient2)" dot={false} activeDot={{r:4,fill:isPositive?"#22c55e":"#ef4444",strokeWidth:0}} />
         </AreaChart>
       </ResponsiveContainer>
+
       <div className="flex items-center justify-between mt-2 text-xs text-[#64748b]">
         <span>Baseline: ${budgetDemo.toFixed(2)}</span>
-        <span className={isPositive ? "text-green-400" : "text-red-400"}>
-          {isPositive ? "📈 " : "📉 "}PnL totale: {isPositive ? "+" : ""}{(latestEquity - budgetDemo).toFixed(2)}$
+        <span className={isPositive?"text-green-400":"text-red-400"}>
+          {isPositive?"📈 ":"📉 "}PnL: {isPositive?"+":""}{(latestEquity-budgetDemo).toFixed(2)}$
         </span>
       </div>
     </div>
@@ -229,9 +273,7 @@ interface OverviewData {
   realizedPnl: number;
   unrealizedPnl: number;
   totalBudget: number;
-  prevDayTotalBudget: number | null;
-  dayChangePct: number | null;
-  dayChangeValue: number | null;
+  changes?: PeriodChanges;
   activeStrategies: number;
   openPositions: number;
   signalsToday: number;
@@ -256,16 +298,24 @@ export default function HomePage() {
   const [allDone, setAllDone] = useState(false);
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [openTrades, setOpenTrades] = useState<TradeData[]>([]);
-  const [closedTrades, setClosedTrades] = useState<TradeData[]>([]);
-  const [marketData, setMarketData] = useState<any>(null);
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+    const [closedTrades, setClosedTrades] = useState<TradeData[]>([]);
+    const [marketData, setMarketData] = useState<any>(null);
+    const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+    const [activeRange, setActiveRange] = useState<string>("all");
 
-  // Auto-refresh overview + trades ogni 10s (era 30s)
+    const handleDateChange = (from: string, to: string) => {
+      setActiveRange("custom");
+      fetch(`/api/overview?range=custom&from=${from}&to=${to}`).then(r=>r.json()).then(d=>{
+        if(d.changes) setOverview(prev=>prev?{...prev,changes:d.changes,equityCurve:d.equityCurve}:null);
+      });
+    };
+
+    // Auto-refresh overview + trades ogni 10s
   useEffect(() => {
     const fetchAll = async () => {
       try {
         const [ovRes, trRes, candleRes] = await Promise.all([
-          fetch("/api/overview"),
+                  fetch(`/api/overview?range=${activeRange}`),
           fetch("/api/trades"),
           fetch("/api/candles"),
         ]);
@@ -386,12 +436,12 @@ export default function HomePage() {
 
   // --- MAIN DASHBOARD ---
   const o = overview || {
-    totalPnl: 0, realizedPnl: 0, unrealizedPnl: 0, totalBudget: 500,
-    prevDayTotalBudget: null, dayChangePct: null, dayChangeValue: null,
-    activeStrategies: 0, openPositions: 0, signalsToday: 0,
-    webhooksToday: 0, liveTradingEnabled: false, budgetDemo: 500,
-    avgDeviation: 0, equityCurve: [],
-  };
+      totalPnl: 0, realizedPnl: 0, unrealizedPnl: 0, totalBudget: 500,
+      changes: undefined,
+      activeStrategies: 0, openPositions: 0, signalsToday: 0,
+      webhooksToday: 0, liveTradingEnabled: false, budgetDemo: 500,
+      avgDeviation: 0, equityCurve: [],
+    };
   // Se overview non è ancora caricata, mostra loading
   if (!overview) {
     return <div className="flex justify-center pt-20"><RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" /></div>;
@@ -543,45 +593,27 @@ export default function HomePage() {
 
       {/* ─── GRAFICO BUDGET TOTALE ────────────────────────────────────── */}
 
-      <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white font-semibold flex items-center gap-2">
-            <Wallet size={18} className="text-indigo-400" />
-            Budget Totale
-          </h2>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="text-right">
-              <div className="text-xs text-[#64748b]">Budget</div>
-              <div className="text-white font-bold text-lg">${o.totalBudget.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            <div className="glass-card p-5">
+              <h2 className="text-white font-semibold flex items-center gap-2 mb-4">
+                <Wallet size={18} className="text-indigo-400" />
+                Budget Totale
+              </h2>
+              {o.equityCurve && o.equityCurve.length > 1 ? (
+                <BudgetLineChart
+                  data={o.equityCurve}
+                  budgetDemo={o.budgetDemo}
+                  activeRange={activeRange}
+                  changes={o.changes}
+                  onRangeChange={(r) => setActiveRange(r)}
+                  onDateChange={handleDateChange}
+                />
+              ) : (
+                <div className="text-center py-6 text-[#64748b] text-sm">
+                  <BarChart3 size={24} className="mx-auto mb-2 opacity-30" />
+                  Dati equity non ancora disponibili — saranno generati al prossimo report giornaliero.
+                </div>
+              )}
             </div>
-            {o.dayChangeValue !== null && o.dayChangePct !== null && (
-              <>
-                <div className="text-right">
-                  <div className="text-xs text-[#64748b]">Variazione 24h</div>
-                  <div className={`font-bold text-lg flex items-center gap-1 ${o.dayChangeValue >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {o.dayChangeValue >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                    {o.dayChangeValue >= 0 ? "+" : ""}{o.dayChangeValue.toFixed(2)}$
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-[#64748b]">% su ieri</div>
-                  <div className={`font-bold text-lg ${o.dayChangePct >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {o.dayChangePct >= 0 ? "+" : ""}{o.dayChangePct.toFixed(2)}%
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-        {o.equityCurve && o.equityCurve.length > 1 ? (
-          <BudgetLineChart data={o.equityCurve} budgetDemo={o.budgetDemo} />
-        ) : (
-          <div className="text-center py-6 text-[#64748b] text-sm">
-            <BarChart3 size={24} className="mx-auto mb-2 opacity-30" />
-            Dati equity non ancora disponibili — saranno generati al prossimo report giornaliero.
-          </div>
-        )}
-      </div>
 
       {/* ─── GRAFICI A CANDELE — 10 asset ───────────────────────────────── */}
 
