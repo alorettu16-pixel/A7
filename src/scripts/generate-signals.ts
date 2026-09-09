@@ -12,7 +12,9 @@ let lastExposureBlockNotif = 0;
 const EXPOSURE_BLOCK_COOLDOWN = 30 * 60 * 1000;
 
 // Asset monitorati — più ampia copertura per più segnali
-const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "DOT"];
+const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT"];
+// ADA esclusa temporaneamente: in downtrend, ha causato il 79% delle perdite nelle ultime 48h
+// Verrà reinserita quando mostrerà stabilizzazione sopra EMA100
 
 async function main() {
   const activeStrategies = await db
@@ -71,10 +73,12 @@ async function main() {
 
     // ─── Mappa trade aperti per asset ────────────────────────────────────────
   const openByAsset: Record<string, Set<number>> = {};
+  // Asset che hanno già un trade aperto (blocco multi-entry sullo stesso asset)
+  const hardBlockedAssets = new Set<string>();
   for (const asset of ASSETS) {
-    openByAsset[asset] = new Set(
-      openTradesAll.filter(t => t.asset === asset).map(t => t.strategyId)
-    );
+    const stratIds = openTradesAll.filter(t => t.asset === asset).map(t => t.strategyId);
+    openByAsset[asset] = new Set(stratIds);
+    if (stratIds.length > 0) hardBlockedAssets.add(asset);
   }
 
   let totalSignals = 0;
@@ -149,6 +153,11 @@ async function main() {
 
     // ─── Nuovi segnali ────────────────────────────────────────────────────────
     for (const s of activeStrategies) {
+      // Skippa se l'asset ha già un trade aperto (max 1 posizione per asset)
+      if (hardBlockedAssets.has(asset)) {
+        console.log(`   ⏸ ${asset}: già un trade aperto — skip multi-entry (max 1 posizione per asset)`);
+        continue;
+      }
       // Skippa se l'asset è in cooldown (perdita rapida <6h fa)
       if (cooldownAssets.has(asset)) {
         console.log(`   ⏳ ${asset}: cooldown attivo (perdita rapida <6h fa) — skip ${s.name}`);

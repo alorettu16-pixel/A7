@@ -311,13 +311,23 @@ export async function generateSignals(
       continue;
     }
     if (checkSide === "short" && trend === "bullish") {
-      console.log(`   ⏸ ${asset}: skip SHORT (trend bullish, price sopra EMA100)`);
-      continue;
-    }
+          console.log(`   ⏸ ${asset}: skip SHORT (trend bullish, price sopra EMA100)`);
+          continue;
+        }
 
-    // Valuta il segnale SOLO sull'ultima candela 4h chiusa (candles.length-2),
-    // non sulle ultime 5. Questo evita falsi segnali intra-candela.
-    for (let i = Math.max(6, latestCandles.length - 2); i < latestCandles.length; i++) {
+        // ─── RSI Filter: evita entry su asset in caduta verticale ─────────────
+        if (checkSide === "long") {
+          const rsiVals = computeRSI(closes, 14);
+          const currentRsi = rsiVals[rsiVals.length - 1];
+          if (currentRsi !== undefined && currentRsi <= 35) {
+            console.log(`   ⏸ ${asset}: skip LONG (RSI ${currentRsi.toFixed(0)} ≤ 35 — asset in caduta)`);
+            continue;
+          }
+        }
+
+        // Valuta il segnale SOLO sull'ultima candela 4h chiusa (candles.length-2),
+        // non sulle ultime 5. Questo evita falsi segnali intra-candela.
+        for (let i = Math.max(6, latestCandles.length - 2); i < latestCandles.length; i++) {
       const allEntry = rules.entry.every((e) => {
         const val = getIndicatorValue(e, closes, i, cache, latestCandles);
         if (val === null) return false;
