@@ -304,23 +304,30 @@ export async function generateSignals(
   }
 
   for (const checkSide of sidesToCheck) {
-    // ─── Trend Filter (EMA100) ───────────────────────────────────────────────
-    const trend = getTrend(closes, 100);
-    if (checkSide === "long" && trend === "bearish") {
-      console.log(`   ⏸ ${asset}: skip LONG (trend bearish, price sotto EMA100)`);
-      continue;
-    }
-    if (checkSide === "short" && trend === "bullish") {
-          console.log(`   ⏸ ${asset}: skip SHORT (trend bullish, price sopra EMA100)`);
+    // ─── Trend Filter (EMA100) — solo LONG ──────────────────────────────────
+        // Nota: il filtro SHORT è stato rimosso perché EMA100 è troppo lenta (16gg 4h)
+        // per catturare cambi di trend recenti. Le SHORT si basano sul MACD crossover
+        // e sul filtro RSI per evitare entry in rimbalzo.
+        const trend = getTrend(closes, 100);
+        if (checkSide === "long" && trend === "bearish") {
+          console.log(`   ⏸ ${asset}: skip LONG (trend bearish, price sotto EMA100)`);
           continue;
         }
 
-        // ─── RSI Filter: evita entry su asset in caduta verticale ─────────────
+        // ─── RSI Filter: evita entry controtendenza ────────────────────────────
         if (checkSide === "long") {
           const rsiVals = computeRSI(closes, 14);
           const currentRsi = rsiVals[rsiVals.length - 1];
           if (currentRsi !== undefined && currentRsi <= 35) {
             console.log(`   ⏸ ${asset}: skip LONG (RSI ${currentRsi.toFixed(0)} ≤ 35 — asset in caduta)`);
+            continue;
+          }
+        }
+        if (checkSide === "short") {
+          const rsiVals = computeRSI(closes, 14);
+          const currentRsi = rsiVals[rsiVals.length - 1];
+          if (currentRsi !== undefined && currentRsi >= 65) {
+            console.log(`   ⏸ ${asset}: skip SHORT (RSI ${currentRsi.toFixed(0)} ≥ 65 — asset in rimbalzo)`);
             continue;
           }
         }
