@@ -80,12 +80,14 @@ async function main() {
         const pnlPct = (unrealizedPnl / size) * 100;
 
         // Calcola PnL% basato su high/low per SL/TP (come backtest engine)
+        const useHigh = currentHigh ?? currentPrice;
+        const useLow = currentLow ?? currentPrice;
         const pnlPctHigh = side === "long"
-          ? (currentHigh - entryPrice) / entryPrice * 100
-          : (entryPrice - currentLow) / entryPrice * 100;
+          ? (useHigh - entryPrice) / entryPrice * 100
+          : (entryPrice - useLow) / entryPrice * 100;
         const pnlPctLow = side === "long"
-          ? (currentLow - entryPrice) / entryPrice * 100
-          : (entryPrice - currentHigh) / entryPrice * 100;
+          ? (useLow - entryPrice) / entryPrice * 100
+          : (entryPrice - useHigh) / entryPrice * 100;
 
         // Cerca la strategia per leggere SL/TP + time exit
         const strat = allStrategies.find(s => s.id === t.strategyId);
