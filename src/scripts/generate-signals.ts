@@ -11,10 +11,9 @@ import { sendTelegram, formatTradeOpen, formatTradeClose, formatAlert, formatErr
 let lastExposureBlockNotif = 0;
 const EXPOSURE_BLOCK_COOLDOWN = 30 * 60 * 1000;
 
-// Asset monitorati — più ampia copertura per più segnali
-const ASSETS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "DOT"];
-// ADA esclusa temporaneamente: in downtrend, ha causato il 79% delle perdite nelle ultime 48h
-// Verrà reinserita quando mostrerà stabilizzazione sopra EMA100
+// Asset monitorati — top performer dai dati reali (LINK +3530$, DOGE +1703$, SOL +105$, AVAX +79$)
+// Esclusi per perdita netta: BTC (-6$), XRP (-182$), ADA (-235$), BNB (68$ marginale), DOT (28$ marginale), ETH (15$ marginale)
+const ASSETS = ["LINK", "DOGE", "SOL", "AVAX"];
 
 async function main() {
   const activeStrategies = await db

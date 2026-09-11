@@ -137,12 +137,15 @@ async function getExitRulesForTrade(tradeId: number): Promise<ExitRules> {
       effectiveSl = await getDynamicStopPct(trade.asset, trade.entryPrice, effectiveSl, trade.side as "long" | "short");
     }
 
+    const trailingActivate = params.trailingActivatePct ?? params.trailingActivate ?? DEFAULT_EXIT_RULES.trailingActivatePct;
+    const trailingDistance = params.trailingDistancePct ?? params.trailingDistance ?? DEFAULT_EXIT_RULES.trailingDistancePct;
+
     return {
       takeProfitPct: tp ?? DEFAULT_EXIT_RULES.takeProfitPct,
       stopLossPct: effectiveSl,
       timeExitHours: timeH ?? DEFAULT_EXIT_RULES.timeExitHours,
-      trailingActivatePct: DEFAULT_EXIT_RULES.trailingActivatePct,
-      trailingDistancePct: DEFAULT_EXIT_RULES.trailingDistancePct,
+      trailingActivatePct: trailingActivate,
+      trailingDistancePct: trailingDistance,
     };
   } catch {
     return DEFAULT_EXIT_RULES;
