@@ -241,6 +241,8 @@ async function main() {
           totalSignals++;
           assetOpen.add(s.id);
           currentExposure += actualSize;
+          // Dopo aver aperto una posizione, blocca subito altre entry sullo stesso asset
+          hardBlockedAssets.add(asset);
         }
 
         if (signals.length === 0 && !alreadyOpen) {
