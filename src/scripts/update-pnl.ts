@@ -29,16 +29,41 @@ async function main() {
   for (const [asset, trades] of Object.entries(byAsset)) {
     try {
       // Prendi l'ultima candela 1m per prezzo più fresco possibile
-      const candles = await getCandles(asset, "1m", new Date(Date.now() - 60 * 60 * 1000), new Date(), "bitget");
-      if (candles.length === 0) {
-        console.log(`   ⚠ ${asset}: nessun dato`);
-        continue;
+      let candles: any[] = [];
+      let currentPrice: number | null = null;
+      let currentHigh: number | null = null;
+      let currentLow: number | null = null;
+      let candleError: string | null = null;
+      try {
+        candles = await getCandles(asset, "1m", new Date(Date.now() - 60 * 60 * 1000), new Date(), "bitget");
+      } catch (err: unknown) {
+        candleError = err instanceof Error ? err.message : String(err);
       }
 
-      const latest = candles[candles.length - 1];
-      const currentPrice = latest.close;
-      const currentHigh = latest.high;
-      const currentLow = latest.low;
+      // Fallback: usa il price da un trade aperto se le candele non sono disponibili
+      if (candles.length === 0 && trades.length > 0) {
+        currentPrice = trades[0].currentPrice;
+        candleError = candleError || "no candle data";
+      } else if (candles.length > 0) {
+        const latest = candles[candles.length - 1];
+        currentPrice = latest.close;
+        currentHigh = latest.high;
+        currentLow = latest.low;
+      }
+
+      if (currentPrice === null) {
+        console.log(`   ⚠ ${asset}: nessun dato disponibile — time exit comunque controllato`);
+        // Se abbiamo solo il prezzo del trade, usiamo quello
+        currentPrice = trades[0]?.currentPrice ?? 0;
+        if (currentPrice === 0) {
+          console.log(`   ⚠ ${asset}: skip (nessun prezzo)`);
+          continue;
+        }
+      }
+
+      if (candleError) {
+        console.log(`   ⚠ ${asset}: getCandles error (${candleError.slice(0, 60)}) — time exit attivo`);
+      }
 
       for (const t of trades) {
         const entryPrice = t.entryPrice;
