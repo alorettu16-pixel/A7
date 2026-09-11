@@ -1,5 +1,6 @@
 // Seed RSI36 Oversold LONG su 4h per SOL, ETH, DOGE — solo INSERT, non distruttivo
 import db, { strategies } from "@/db";
+import { sql } from "drizzle-orm";
 
 // RSI 36 Oversold: crossunder RSI(14) sotto 36 → LONG
 const RSI_VARIANTS = [
@@ -24,10 +25,8 @@ console.log(`\nAggiungo ${RSI_VARIANTS.length} strategie RSI36 Oversold...\n`);
 for (const v of RSI_VARIANTS) {
   const name = buildName(v.asset, v.sl, v.tp);
 
-  // Controlla se esiste già
-  const existing = db.select().from(strategies)
-    .where((s: any) => `name = '${name}'`)
-    .all() as any[];
+  // Controlla se esiste già — usa db.$client per SQL diretto
+  const existing = db.$client.prepare("SELECT id FROM strategies WHERE name = ?").all(name) as any[];
   if (existing.length > 0) {
     console.log(`  ⏩ ${name}: già presente (id ${existing[0].id}), skip`);
     continue;
@@ -59,18 +58,21 @@ for (const v of RSI_VARIANTS) {
     sizing_value: 50,
   };
 
-  db.insert(strategies).values({
+  const insertSql = db.$client.prepare(`
+    INSERT INTO strategies (name, source, category, source_description, entry_rules_json, exit_rules_json, parameters_json, status, is_demo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertSql.run(
     name,
-    source: "traderdev_backtest",
-    category: "mean_reversion",
-    sourceDescription:
-      `RSI(14) crossunder 36 → LONG su ${v.asset} 4h. Backtest Jun-Sep 2026: SOL +21.7% Sharpe 2.9, ETH +1.2%, DOGE +0.4%. SL2/TP4, timeExit 24h.`,
-    entryRulesJson: JSON.stringify(entryRules),
-    exitRulesJson: JSON.stringify(exitRules),
-    parametersJson: JSON.stringify(parameters),
-    status: "paper_active",
-    isDemo: true,
-  }).run();
+    "traderdev_backtest",
+    "mean_reversion",
+    `RSI(14) crossunder 36 → LONG su ${v.asset} 4h. Backtest Jun-Sep 2026: SOL +21.7% Sharpe 2.9, ETH +1.2%, DOGE +0.4%. SL2/TP4, timeExit 24h.`,
+    JSON.stringify(entryRules),
+    JSON.stringify(exitRules),
+    JSON.stringify(parameters),
+    "paper_active",
+    "1"  // is_demo = true
+  );
 
   console.log(`  ✅ ${name} — paper_active`);
 }
